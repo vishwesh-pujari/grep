@@ -1,0 +1,33 @@
+File Handling library : 
+
+We have to write code for fopen(), fread(), fwrite(), ...
+Read man pages of all of these
+
+On top of hardware, we have the OS, and OS gives us functions like open(), read(), write(), lseek()
+
+fopen() calls open() in its code. So all fopen(), fread() functions are wrapper functions
+
+Handling buffered array in case of file handling library is important
+
+Standard File Descriptors : 0, 1, 2
+
+Grep : 
+opendir(), readdir(), stat(), chmod(), getopt(), mkdir()
+getopt() is for getting command line argument
+For coloured output : https://www.theurbanpenguin.com/4184-2/
+Regex in C : https://www.educative.io/edpresso/how-to-write-regular-expressions-in-c
+https://stackoverflow.com/questions/16417454/why-regexec-in-posix-c-always-return-the-first-match-how-can-it-return-all-mat
+findstr is the command which is the alternative for grep in windows
+Our program must be able to handle commands like grep "#include" *.c
+Now here the name of the file also must be considered as a regular expression
+Include a flag which will only print the first match in the entire directory  :   https://stackoverflow.com/questions/14093452/grep-only-the-first-match-and-stop
+https://codereview.stackexchange.com/questions/44027/a-regular-expression-parsing-library-in-c
+https://github.com/kokke/tiny-regex-c
+https://www.cs.princeton.edu/courses/archive/spr09/cos333/beautiful.html
+https://softwareengineering.stackexchange.com/questions/150746/improving-performance-for-grepping-over-a-huge-file
+
+sort :
+
+tar : tar files are created for ease and efficieny
+
+Use stat() to get all info abt file size, file owner, file permission, etc

@@ -1,0 +1,37 @@
+https://www.geeksforgeeks.org/spelling-checker-in-python/
+How to embed python code in C
+Include a spelling checker in grep
+sudo apt-get install python3-dev
+python-dev contains the header files you need to build Python extensions. lxml is a Python C-API extension that is compiled when you do pip install lxml. The lxml sources have at least something like #include <Python.h> in the code. The compiler looks for the Python.h file during compilation, hence those files need to be on your system such that they can be found. On Linux typically, the binary libraries and header files of packages like python are separate. Hence you can have Python installed and everything works fine but when you want to build extensions you need to install the corresponding dev package.
+
+https://docs.python.org/3/extending/embedding.html
+
+
+grep -r "main" *.c or grep -r "main" *.txt only checks for .c or .txt files in the same directory
+They don't check .c or .txt files in the subdirectories
+
+However grep -r "main" * works
+Improve this problem
+
+For binary files just print that ./a.out matched
+
+grep without options like -E or -F considers the regex as basic regex
+-G indicates basic regex. This is the default
+In basic regex [a-z] is allowed but [a-z]+ doesn't mean repetition of [a-z], It assumes + as literal character
+
+In basic regex while regcomp() we use 0 and not REG_EXTENDED or anything
+
+For extended Regex use -E
+
+-F indicates fixed string. i.e indicate options as strings and not patterns
+Here use strstr() instead
+
+Add another flag which states how u want the files to be interpreted. As regular expressions or fixed strings
+eg *.txt in terms of regex can be any file ending with .txt. Convert regex to .*\.txt
+Also *.txt also can be a file named *.txt literally
+
+In file names we only have to handle the *
+We can by default consider * has .* regular expression
+But we can consider another option which tells that consider * as character literal in filename
+
+Solve this Problem : https://stackoverflow.com/questions/981601/colorized-grep-viewing-the-entire-file-with-highlighted-matches

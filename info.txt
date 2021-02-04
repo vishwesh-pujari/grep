@@ -1,0 +1,75 @@
+grep - globally search for regular expression and print out
+
+https://www.geeksforgeeks.org/grep-command-in-unixlinux/
+man grep
+https://www.educative.io/edpresso/how-to-write-regular-expressions-in-c
+
+In regex.h we have support for the character class shorthands \s, \S, \w and \W, but not \d and \D
+https://en.wikipedia.org/wiki/Regular_expression#POSIX
+
+We have to write as [[:digit:]], [[:alnum:]], etc
+See the entire wikipedia doc
+
+In documentation write all possible combinations of this [[:digit:]], etc.
+
+
+* or *.txt is not a valid regular expression.
+[0-9]* or v* is a valid regular expression
+Because in regular expression * means 0 or more times repetition. * or *.txt are not preceded by any character
+
+So * and *.txt are only used in linux command line. * here indicates any character any number of times
+
+So * or *.txt in terms of regular expressions means .* or .*\.txt 
+Becoz in regex . indicates any charater and * indicates any number of times
+for .txt we have to escape this . by \.
+
+Also grep <pattern> *.txt means search in all files ending with .txt
+But grep <pattern> "*.txt" means search in the file named *.txt
+
+In man grep see all this
+Finally, certain named classes of characters are predefined within bracket expressions, as follows.  Their names are self explanatory, and they  are  [:alnum:],
+       [:alpha:],  [:blank:],  [:cntrl:],  [:digit:], [:graph:], [:lower:], [:print:], [:punct:], [:space:], [:upper:], and [:xdigit:].  For example, [[:alnum:]] means
+       the character class of numbers and letters in the current locale.  In the C locale and ASCII character set encoding, this is the  same  as  [0-9A-Za-z].   (Note
+       that  the  brackets  in  these  class names are part of the symbolic names, and must be included in addition to the brackets delimiting the bracket expression.)
+       Most meta-characters lose their special meaning inside bracket expressions.  To include a literal ] place it first in the list.  Similarly, to include a literal
+       ^ place it anywhere but first.  Finally, to include a literal - place it last
+
+Converting Regex to postfix
+https://gregorycernera.medium.com/converting-regular-expressions-to-postfix-notation-with-the-shunting-yard-algorithm-63d22ea1cf88
+
+grep on directories
+
+vishwesh-pujari@DESKTOP-G7CR8K4:~$ grep -E "[a-z]+" fileHandling/
+grep: fileHandling/: Is a directory
+vishwesh-pujari@DESKTOP-G7CR8K4:~$ grep -E -r "[a-z]+" fileHandling/
+fileHandling/file.c:#include "file.h"
+fileHandling/file.c:#include <sys/types.h>
+fileHandling/file.c:#include <sys/stat.h>
+fileHandling/file.c:#include <fcntl.h>
+fileHandling/file.c:#include <unistd.h>
+fileHandling/file.c:#include <stdlib.h>
+fileHandling/file.c:MYFILE *myfopen(char *pathname, const char *mode) {
+fileHandling/file.c:    MYFILE *fp;
+fileHandling/file.c:    fp = (MYFILE*) malloc(sizeof(MYFILE));
+fileHandling/file.c:    fp->fileDescriptor = open(pathname, "r");
+fileHandling/file.c:    return fp;
+fileHandling/file.c:void myfclose(MYFILE *fp) {
+fileHandling/file.c:    close(fp->fileDescriptor);
+fileHandling/file.c:    free(fp);
+fileHandling/file.c:    return;
+fileHandling/file.h:typedef struct MYFILE {
+fileHandling/file.h:    int fileDescriptor;
+fileHandling/file.h:MYFILE *myfopen(char*, const char*);
+fileHandling/file.h:void myfclose(MYFILE*);
+fileHandling/main.c:int main()
+
+See what does grep do for standard input (file = -)
+It works like bc
+After every line if a match is found then it is displayed
+
+grep -E "[a-z]" main.c tp.c re*.c
+This is also allowed
+
+https://www.gnu.org/software/libc/manual/html_node/Getopt-Long-Options.html
+
+./grep --extended_regexp "[$]" "vi\$sg" <- for matching dollar
