@@ -1,7 +1,6 @@
 #include "regularExpression.h"
 #include <stdio.h>
 #include <errno.h>
-#include <unistd.h> // for getopt
 #include <getopt.h> // for getopt_long
 #include <stdlib.h>
 
@@ -59,16 +58,26 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 	if (optind == 2 && argc == 3) // one option is given but only the pattern is mentioned (bcoz argc = 3) and string is not
 	       printUsageAndExit();
 
-	regexStruct *matches;
-	matches = regularExpression(argv[optind], argv[optind + 1], regexCompilationOption); // optind -> pattern, optind + 1 -> string
+	regex_t regex;
+	regexStruct compile = regularExpressionCompile(&regex, argv[optind], regexCompilationOption); // compile the regex. optind -> pattern
+	if (compile.returnValue != 0) { // if regex is invalid
+		fprintf(stderr, "Regex Compilation error : %s\n", compile.errorMessage);
+		regularExpressionDestroy(&regex);
+		return 0;
+	}
+	regexStruct *matches; // matches will hold the info about matched substring
+	matches = regularExpression(&regex, argv[optind + 1]); // optind + 1 -> string
+	if (!matches) { // matches is NULL
+		fprintf(stderr, "No Memory\n");
+		regularExpressionDestroy(&regex);
+		return ENOMEM;
+	}
 	int i, j = 0, k;
 
 	if (matches[0].returnValue != 0) { // no match at all
-		if (matches[0].errorFrom == REGCOMP)
-			fprintf(stderr, "Regex Compilation error : ");
-		else if (matches[0].errorFrom == REGEXEC)
-			fprintf(stderr, "Regex Matching error : ");
+		fprintf(stderr, "Regex Matching error : ");
 		fprintf(stderr, "%s\n", matches[0].errorMessage);
+		regularExpressionDestroy(&regex);
 		free(matches);
 		return 0;
 	}
@@ -87,6 +96,7 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 	}
 	printf("\n");
 
+	regularExpressionDestroy(&regex);
 	free(matches);
 
 	return 0;

@@ -9,6 +9,7 @@ https://docs.python.org/3/extending/embedding.html
 
 grep -r "main" *.c or grep -r "main" *.txt only checks for .c or .txt files in the same directory
 They don't check .c or .txt files in the subdirectories
+We can use --include or --exclude here for solving this problem
 
 However grep -r "main" * works
 Improve this problem
@@ -35,3 +36,4 @@ We can by default consider * has .* regular expression
 But we can consider another option which tells that consider * as character literal in filename
 
 Solve this Problem : https://stackoverflow.com/questions/981601/colorized-grep-viewing-the-entire-file-with-highlighted-matches
+Here write program like cat and display highlighted text. Also show line numbers. It is like showing matches in context of the file
