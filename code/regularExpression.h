@@ -2,7 +2,11 @@
 
 enum {
 	BASIC_REGEX,
-	EXTENDED_REGEX,	
+	EXTENDED_REGEX,
+	IGNORE_CASE,
+	NO_IGNORE_CASE,
+	NO_FIXED_STRING,
+	FIXED_STRING
 };
 
 #define ERROR_SIZE 1024
@@ -14,5 +18,5 @@ typedef struct regexStruct {
 }regexStruct;
 
 regexStruct* regularExpression(regex_t*, char*);
-regexStruct regularExpressionCompile(regex_t*, char*, int);
+regexStruct regularExpressionCompile(regex_t*, char*, int, int);
 void regularExpressionDestroy(regex_t*);

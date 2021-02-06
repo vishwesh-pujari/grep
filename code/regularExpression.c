@@ -104,14 +104,18 @@ regexStruct *regularExpression(regex_t *regex, char *string) { // takes a regex 
 	return retArray;
 }
 
-regexStruct regularExpressionCompile(regex_t *regex, char *pattern, int regexCompilationOption) {
+regexStruct regularExpressionCompile(regex_t *regex, char *pattern, int regexCompilationOption, int ignoreCaseOption) {
 	
 	regexStruct ret = {};
 	int returnValue;
-	if (regexCompilationOption == BASIC_REGEX)
+	if (regexCompilationOption == BASIC_REGEX && ignoreCaseOption == NO_IGNORE_CASE)
 		returnValue = regcomp(regex, pattern, 0); // compile the regular expression. returnValue will be 0 if regex is compiled successfully
-	else if (regexCompilationOption == EXTENDED_REGEX)
+	else if (regexCompilationOption == BASIC_REGEX && ignoreCaseOption == IGNORE_CASE)
+		returnValue = regcomp(regex, pattern, 0 | REG_ICASE);
+	else if (regexCompilationOption == EXTENDED_REGEX && ignoreCaseOption == NO_IGNORE_CASE)
 		returnValue = regcomp(regex, pattern, REG_EXTENDED);
+	else if (regexCompilationOption == EXTENDED_REGEX && ignoreCaseOption == IGNORE_CASE)
+		returnValue = regcomp(regex, pattern, REG_EXTENDED | REG_ICASE);
 	// The Extended Regular Expressions or ERE flavor standardizes a flavor similar to the one used by the UNIX egrep command.
 	
 	if (returnValue != 0) { // regex compilation failed

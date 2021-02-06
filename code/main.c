@@ -1,65 +1,87 @@
 #include "regularExpression.h"
 #include <stdio.h>
+#include <string.h>
 #include <errno.h>
 #include <getopt.h> // for getopt_long
 #include <stdlib.h>
 
-#define LONG_OPTIONS_SIZE 3 // the last struct of longoptions must be 0
+#define LONG_OPTIONS_SIZE 6 // the last struct of longoptions must be 0
 
 void printUsageAndExit();
-int validateNumberOfOptions(int);
+//int validateNumberOfOptions(int);
 void initLongOptionsArray(struct option *longoptions, int index, const char *name, int has_arg, int *flag, int val);
 
 int main(int argc, char **argv) { // To give space seperated command line arg then use " "
 				  // eg, ./a.out "[a-z] [0-9]" "Vishwesh 123"
-				  
-	int option, notValidCompilationFlag = 0, regexCompilationOption;
-
+	
+	int option;
+       	int Gfound = 0, Efound = 0;
+       	int regexCompilationOption = BASIC_REGEX, ignoreCaseOption = NO_IGNORE_CASE, fixedStringOption = NO_FIXED_STRING; // put default options
+	int longIndex; // to catch hold of which long option has been selected
+	
 	struct option longoptions[LONG_OPTIONS_SIZE];
-	initLongOptionsArray(longoptions, 0, "basic_regexp", no_argument, NULL, 'G'); // 'G' is the short option form of --basic_regexp
-	initLongOptionsArray(longoptions, 1, "extended_regexp", no_argument, NULL, 'E'); // 'E' is the short option form of --extended_regexp
-	initLongOptionsArray(longoptions, 2, "", 0, NULL, 0); // last struct must be initialised with 0	
+	initLongOptionsArray(longoptions, 0, "basic-regexp", no_argument, NULL, 'G'); // 'G' is the short option form of --basic_regexp
+	initLongOptionsArray(longoptions, 1, "extended-regexp", no_argument, NULL, 'E'); // 'E' is the short option form of --extended_regexp
+	initLongOptionsArray(longoptions, 2, "ignore-case", no_argument, NULL, 'i');
+	initLongOptionsArray(longoptions, 3, "no-ignore-case", no_argument, NULL, 0); // --no-ignore-case doesn't have any short hand option.
+	initLongOptionsArray(longoptions, 4, "fixed-string", no_argument, NULL, 'F');
+	initLongOptionsArray(longoptions, 5, "", 0, NULL, 0); // last struct must be initialised with 0	
 
 	// The getopt_long() function works like getopt() except that it also accepts long options, started with two dashes
 	// long option starts with -- and short option with -
 	// if flag is NULL, then getopt_long() returns val.  (For example, the  calling  program may  set  val  to the equivalent short option character.)
 
-	while ((option = getopt_long(argc, argv, "GE", longoptions, NULL)) != -1) { // until no more options are left
+	// --ignore-case and --no-ignore-case can be used both at a time. The one who is second is taken into consideration 
+	while ((option = getopt_long(argc, argv, "GEiF", longoptions, &longIndex)) != -1) { // until no more options are left
+		//printf("option = %d, longIndex = %d\n", option, longIndex);
 		switch (option) {
 			case 'G':
-				if (notValidCompilationFlag) // if both G and E are specified at a time
+				if (Efound) // if E is already specified
 					printUsageAndExit();
-				notValidCompilationFlag = 1; // make notValid = 1 becoz G has now been specified
+				Gfound = 1; // G has been found now
 				regexCompilationOption = BASIC_REGEX;
 				break;
 
 			case 'E':
-				if (notValidCompilationFlag)
+				if (Gfound)
 					printUsageAndExit();
-				notValidCompilationFlag = 1;
+				Efound = 1;
 				regexCompilationOption = EXTENDED_REGEX;
+				break;
+
+			case 'i': // no need to validate the number of -i
+				ignoreCaseOption = IGNORE_CASE;
+				break;
+
+			case 'F':
+				fixedStringOption = FIXED_STRING;
+				break;
+
+			case '\0': // option will hold value 0 when the long option doesn't have any equivalent short option
+				if (!strcmp(longoptions[longIndex].name, "no-ignore-case"))
+					ignoreCaseOption = NO_IGNORE_CASE;
 				break;
 
 			default: // any other invalid option
 				printUsageAndExit();
-				break;
 		}
 	}
 
-	if (!validateNumberOfOptions(argc)) // if number of arguments is not valid
-		printUsageAndExit();
+	/*if (!validateNumberOfOptions(argc)) // if number of arguments is not valid
+		printUsageAndExit();*/
 
 	// optind holds index of first non-option argument in argv
 	// getopt_long modifies argv. It brings all flags to left of argv and all non-flag args to the right
 
-	if (optind == 1) // no option is specified. If some option is specified then optind must be minimum 2
-		regexCompilationOption = BASIC_REGEX; // default
+	/*if (optind == 1) // no option is specified. If some option is specified then optind must be minimum 2
+		regexCompilationOption = BASIC_REGEX; // default*/	
 
-	if (optind == 2 && argc == 3) // one option is given but only the pattern is mentioned (bcoz argc = 3) and string is not
+	if (argc - optind != 2) // argc - optind must be 2, then only we will get "PATTERN" and "STRING" both
+				// if argc - optind is less than 2 it indicates more number of options, and greater than 2 indicates more strings and patterns
 	       printUsageAndExit();
 
 	regex_t regex;
-	regexStruct compile = regularExpressionCompile(&regex, argv[optind], regexCompilationOption); // compile the regex. optind -> pattern
+	regexStruct compile = regularExpressionCompile(&regex, argv[optind], regexCompilationOption, ignoreCaseOption); // compile the regex. optind -> pattern
 	if (compile.returnValue != 0) { // if regex is invalid
 		fprintf(stderr, "Regex Compilation error : %s\n", compile.errorMessage);
 		regularExpressionDestroy(&regex);
@@ -104,15 +126,17 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 
 void printUsageAndExit() {
 	fprintf(stderr, "usage : ./grep [OPTIONS] \"PATTERN\" \"STRING\"\n");
-	fprintf(stderr, "[OPTIONS] : -G,--basic_regexp (this is default) | -E,--extended_regexp\n"); // | indicates OR
+	fprintf(stderr, "[OPTIONS] : -G,--basic-regexp (this is default) | -E,--extended-regexp\n"); // | indicates OR
+	fprintf(stderr, "          : -i,--ignore-case\n");
+	fprintf(stderr, "          : --no-ignore-case\n");
 	exit(EINVAL);
 }
 
-int validateNumberOfOptions(int argc) {
-	if (argc >= 3 && argc <= 4)
+/*int validateNumberOfOptions(int argc) {
+	if (argc >= 3 && argc <= 5)
 		return 1;
 	return 0;
-}
+}*/
 
 void initLongOptionsArray(struct option *longoptions, int index, const char *name, int has_arg, int *flag, int val) {
 	
