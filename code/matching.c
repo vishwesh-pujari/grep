@@ -3,11 +3,13 @@
  * POSIX (Portable Operating System Interface) is a well-known library for regular expressions in C
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "regularExpression.h"
+#include "matching.h"
 
 regexStruct regularExpressionHelper(char*, regex_t*);
+void toLower(char *str); 
 
 regexStruct regularExpressionHelper(char *string, regex_t *regex) { // matches the regular expression with string and returns structure with info about matches
 	
@@ -130,5 +132,53 @@ regexStruct regularExpressionCompile(regex_t *regex, char *pattern, int regexCom
 
 void regularExpressionDestroy(regex_t *regex) {
 	regfree(regex);
+	return;
+}
+
+int *substr(char* str, char* subStr, int ignoreCase) { // this function returns start index of where the substring is found. The end index can be found by strlen(substring)
+	// WARNING: this function modifies the str and subStr passed to it
+	int lenStr = strlen(str);
+	int lenSubStr = strlen(subStr);
+	int i, j, k, l = 0;
+
+	if (ignoreCase == IGNORE_CASE) {
+		toLower(str);
+		toLower(subStr);
+	}
+
+	int *matches;
+	matches = (int*) malloc(sizeof(int));
+	if (!matches)
+		return NULL;
+	
+	if (lenSubStr > lenStr) {
+		matches[0] = -1;
+		return matches;
+	}
+	
+	for (i = 0; str[i]; i++)
+		if (str[i] == subStr[0]) {
+			j = i + 1; // j -> str
+			k = 1; // k -> subStr
+			for (; subStr[k] && str[j] && (str[j] == subStr[k]); k++, j++);
+			if (subStr[k] == '\0') {
+				matches[l++] = i;
+				matches = (int*) realloc(matches, (i + 1) * sizeof(int));
+				if (!matches)
+					return NULL;
+				i = j - 1;
+			}
+		}
+	matches[l++] = -1;
+	return matches;
+}
+
+void toLower(char *str) { 
+	
+	int i;
+	for (i = 0; str[i]; i++)
+		if (str[i] >= 'A' && str[i] <= 'Z')
+			str[i] += 32;
+
 	return;
 }

@@ -1,3 +1,5 @@
+// matching.h is the name because this file does either regular expression matching or fixed string matching
+
 #include <regex.h> // POSIX library
 
 enum {
@@ -20,3 +22,5 @@ typedef struct regexStruct {
 regexStruct* regularExpression(regex_t*, char*);
 regexStruct regularExpressionCompile(regex_t*, char*, int, int);
 void regularExpressionDestroy(regex_t*);
+
+int *substr(char*, char*, int); // this function returns start index of where the substring is found. The end index can be found by strlen(substring)

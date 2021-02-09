@@ -1,4 +1,4 @@
-#include "regularExpression.h"
+#include "matching.h"
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -15,7 +15,7 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 				  // eg, ./a.out "[a-z] [0-9]" "Vishwesh 123"
 	
 	int option;
-       	int Gfound = 0, Efound = 0;
+       	int Gfound = 0, Efound = 0, Ffound = 0;
        	int regexCompilationOption = BASIC_REGEX, ignoreCaseOption = NO_IGNORE_CASE, fixedStringOption = NO_FIXED_STRING; // put default options
 	int longIndex; // to catch hold of which long option has been selected
 	
@@ -36,14 +36,14 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 		//printf("option = %d, longIndex = %d\n", option, longIndex);
 		switch (option) {
 			case 'G':
-				if (Efound) // if E is already specified
+				if (Efound || Ffound) // if E is already specified
 					printUsageAndExit();
 				Gfound = 1; // G has been found now
 				regexCompilationOption = BASIC_REGEX;
 				break;
 
 			case 'E':
-				if (Gfound)
+				if (Gfound || Ffound)
 					printUsageAndExit();
 				Efound = 1;
 				regexCompilationOption = EXTENDED_REGEX;
@@ -54,6 +54,9 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 				break;
 
 			case 'F':
+				if (Gfound || Efound)
+					printUsageAndExit();
+				Ffound = 1;
 				fixedStringOption = FIXED_STRING;
 				break;
 
@@ -79,6 +82,35 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 	if (argc - optind != 2) // argc - optind must be 2, then only we will get "PATTERN" and "STRING" both
 				// if argc - optind is less than 2 it indicates more number of options, and greater than 2 indicates more strings and patterns
 	       printUsageAndExit();
+	
+	if (fixedStringOption == FIXED_STRING) {
+		int lenSubStr = strlen(argv[optind]);
+		int *matches = substr(argv[optind + 1], argv[optind], ignoreCaseOption), i, j = 0, k;
+		if (!matches) {
+			fprintf(stderr, "No Memory\n");
+			return ENOMEM;
+		}
+		if (matches[0] == -1) {
+			fprintf(stderr, "No Match\n");
+			return 0;
+		}
+		for (i = 0; argv[optind + 1][i]; i++) {
+			if (matches[j] != i) // print normally
+				printf("%c", argv[optind + 1][i]);
+			else {
+				printf("\033[0;33m"); // yellow color
+				for (k = matches[j]; k < matches[j] + lenSubStr; k++) // print the matched substring
+					printf("%c", argv[optind + 1][k]);
+				i = k - 1;
+				j++; // go to the next match
+				printf("\033[0m"); // set color to normal
+			}
+		}
+		printf("\n");
+		
+		free(matches);
+		return 0;	
+	}
 
 	regex_t regex;
 	regexStruct compile = regularExpressionCompile(&regex, argv[optind], regexCompilationOption, ignoreCaseOption); // compile the regex. optind -> pattern
@@ -126,9 +158,9 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 
 void printUsageAndExit() {
 	fprintf(stderr, "usage : ./grep [OPTIONS] \"PATTERN\" \"STRING\"\n");
-	fprintf(stderr, "[OPTIONS] : -G,--basic-regexp (this is default) | -E,--extended-regexp\n"); // | indicates OR
+	fprintf(stderr, "[OPTIONS] : -G,--basic-regexp (default) | -E,--extended-regexp | -F,--fixed-string\n"); // | indicates OR
 	fprintf(stderr, "          : -i,--ignore-case\n");
-	fprintf(stderr, "          : --no-ignore-case\n");
+	fprintf(stderr, "          : --no-ignore-case (default)\n");
 	exit(EINVAL);
 }
 
