@@ -8,6 +8,8 @@
 #include <string.h>
 #include "matching.h"
 
+#define STRING_SIZE 1024
+
 regexStruct regularExpressionHelper(char*, regex_t*);
 void toLower(char *str); 
 
@@ -141,9 +143,13 @@ int *substr(char* str, char* subStr, int ignoreCase) { // this function returns 
 	int lenSubStr = strlen(subStr);
 	int i, j, k, l = 0;
 
+	char strCopy[STRING_SIZE], subStrCopy[STRING_SIZE];
+	strcpy(strCopy, str);
+	strcpy(subStrCopy, subStr);
+	
 	if (ignoreCase == IGNORE_CASE) {
-		toLower(str);
-		toLower(subStr);
+		toLower(strCopy);
+		toLower(subStrCopy);
 	}
 
 	int *matches;
@@ -156,12 +162,12 @@ int *substr(char* str, char* subStr, int ignoreCase) { // this function returns 
 		return matches;
 	}
 	
-	for (i = 0; str[i]; i++)
-		if (str[i] == subStr[0]) {
-			j = i + 1; // j -> str
-			k = 1; // k -> subStr
-			for (; subStr[k] && str[j] && (str[j] == subStr[k]); k++, j++);
-			if (subStr[k] == '\0') {
+	for (i = 0; strCopy[i]; i++)
+		if (strCopy[i] == subStrCopy[0]) {
+			j = i + 1; // j -> strCopy
+			k = 1; // k -> subStrCopy
+			for (; subStrCopy[k] && strCopy[j] && (strCopy[j] == subStrCopy[k]); k++, j++);
+			if (subStrCopy[k] == '\0') {
 				matches[l++] = i;
 				matches = (int*) realloc(matches, (i + 1) * sizeof(int));
 				if (!matches)
