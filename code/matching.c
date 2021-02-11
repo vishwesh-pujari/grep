@@ -13,10 +13,10 @@
 regexStruct regularExpressionHelper(char*, regex_t*);
 void toLower(char *str); 
 
-regexStruct regularExpressionHelper(char *string, regex_t *regex) { // matches the regular expression with string and returns structure with info about matches
+regexStruct regularExpressionHelper(char *string, regex_t *regexp) { // matches the regular expression with string and returns structure with info about matches
 	
 	//printf("string = %s, pattern = %s\n", string, pattern);
-	//regex_t regex; // the regular expression
+	//regex_t regexp; // the regular expression
 	regmatch_t pmatch[1]; // pmatch[0] contains the start and end index about matched string
 
 	regexStruct retStruct = {}; // the structure to be returned
@@ -33,12 +33,12 @@ regexStruct regularExpressionHelper(char *string, regex_t *regex) { // matches t
 		return retStruct;
 	}*/
 	
-	returnValue = regexec(regex, string, 1, pmatch, 0); // 1 in the size of pmatch[] array
+	returnValue = regexec(regexp, string, 1, pmatch, 0); // 1 in the size of pmatch[] array
 	if (returnValue == 0) { // if match is found
 		retStruct.start = pmatch[0].rm_so; // so stands for start of
 		retStruct.end = pmatch[0].rm_eo; // eo stands for end of
 	} else if (returnValue == REG_NOMATCH) {
-		regerror(returnValue, regex, retStruct.errorMessage, ERROR_SIZE); // Store the error in the errorMessage String
+		regerror(returnValue, regexp, retStruct.errorMessage, ERROR_SIZE); // Store the error in the errorMessage String
 		retStruct.returnValue = returnValue;
 	}
 	return retStruct;
@@ -72,7 +72,7 @@ regexStruct regularExpressionHelper(char *string, regex_t *regex) { // matches t
 	return retArray;
 }*/
 
-regexStruct *regularExpression(regex_t *regex, char *string) { // takes a regex and string and returns an array of structs containing info about matches	
+regexStruct *regex(regex_t *regexp, char *string) { // takes a regex and string and returns an array of structs containing info about matches	
 	regexStruct *retArray;
 	retArray = (regexStruct*) malloc(sizeof(regexStruct)); // this retArray contains information about all the matched substring
 	if (!retArray)
@@ -81,7 +81,7 @@ regexStruct *regularExpression(regex_t *regex, char *string) { // takes a regex 
 	int i = 0, offset = 0;
 
 	do {
-		retArray[i++] = regularExpressionHelper(string, regex); // call the function
+		retArray[i++] = regularExpressionHelper(string, regexp); // call the function
 		//printf("retArray[i - 1].end = %d, retArray[i - 1].start = %d, offset = %d\n", retArray[i - 1].end, retArray[i - 1].start, offset);
 		string = string + retArray[i - 1].end; // increment string to search for more matches in string
 		retArray[i - 1].end += offset; // add offset because we had incremented our string
@@ -108,32 +108,32 @@ regexStruct *regularExpression(regex_t *regex, char *string) { // takes a regex 
 	return retArray;
 }
 
-regexStruct regularExpressionCompile(regex_t *regex, char *pattern, int regexCompilationOption, int ignoreCaseOption) {
+regexStruct regexCompile(regex_t *regexp, char *pattern, int regexCompilationOption, int ignoreCaseOption) {
 	
 	regexStruct ret = {};
 	int returnValue;
 	if (regexCompilationOption == BASIC_REGEX && ignoreCaseOption == NO_IGNORE_CASE)
-		returnValue = regcomp(regex, pattern, 0); // compile the regular expression. returnValue will be 0 if regex is compiled successfully
+		returnValue = regcomp(regexp, pattern, 0); // compile the regular expression. returnValue will be 0 if regex is compiled successfully
 	else if (regexCompilationOption == BASIC_REGEX && ignoreCaseOption == IGNORE_CASE)
-		returnValue = regcomp(regex, pattern, 0 | REG_ICASE);
+		returnValue = regcomp(regexp, pattern, 0 | REG_ICASE);
 	else if (regexCompilationOption == EXTENDED_REGEX && ignoreCaseOption == NO_IGNORE_CASE)
-		returnValue = regcomp(regex, pattern, REG_EXTENDED);
+		returnValue = regcomp(regexp, pattern, REG_EXTENDED);
 	else if (regexCompilationOption == EXTENDED_REGEX && ignoreCaseOption == IGNORE_CASE)
-		returnValue = regcomp(regex, pattern, REG_EXTENDED | REG_ICASE);
+		returnValue = regcomp(regexp, pattern, REG_EXTENDED | REG_ICASE);
 	// The Extended Regular Expressions or ERE flavor standardizes a flavor similar to the one used by the UNIX egrep command.
 	
 	if (returnValue != 0) { // regex compilation failed
-		regerror(returnValue, regex, ret.errorMessage, ERROR_SIZE); // Store the error in the errorMessage String
+		regerror(returnValue, regexp, ret.errorMessage, ERROR_SIZE); // Store the error in the errorMessage String
 		ret.returnValue = returnValue;
-		regfree(regex);
+		regfree(regexp);
 		return ret;
 	}
 
 	return ret;
 }
 
-void regularExpressionDestroy(regex_t *regex) {
-	regfree(regex);
+void regularExpressionDestroy(regex_t *regexp) {
+	regfree(regexp);
 	return;
 }
 
@@ -162,19 +162,25 @@ int *substr(char* str, char* subStr, int ignoreCase) { // this function returns 
 		return matches;
 	}
 	
-	for (i = 0; strCopy[i]; i++)
-		if (strCopy[i] == subStrCopy[0]) {
+	for (i = 0; strCopy[i]; i++) {
+		if (subStrCopy[0] == '\0') { // empty string matches everything
+			matches[l++] = i;
+			matches = (int*) realloc(matches, (l + 1) * sizeof(int));
+			if (!matches)
+				return NULL;
+		} else if (strCopy[i] == subStrCopy[0]) {
 			j = i + 1; // j -> strCopy
 			k = 1; // k -> subStrCopy
 			for (; subStrCopy[k] && strCopy[j] && (strCopy[j] == subStrCopy[k]); k++, j++);
 			if (subStrCopy[k] == '\0') {
 				matches[l++] = i;
-				matches = (int*) realloc(matches, (i + 1) * sizeof(int));
+				matches = (int*) realloc(matches, (l + 1) * sizeof(int));
 				if (!matches)
 					return NULL;
 				i = j - 1;
 			}
 		}
+	}
 	matches[l++] = -1;
 	return matches;
 }

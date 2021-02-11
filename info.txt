@@ -73,3 +73,14 @@ This is also allowed
 https://www.gnu.org/software/libc/manual/html_node/Getopt-Long-Options.html
 
 ./grep --extended_regexp "[$]" "vi\$sg" <- for matching dollar
+
+Printing colored output
+https://www.theurbanpenguin.com/4184-2/
+
+grep for searching for directories
+write getopt_long() on ur own
+
+Replace all words in a particular file with another word. Make use of lseek() function here
+For grep --word-match then 
+in vishwesh(), vishwesh is also a word
+So after every match we shouldn't have any alphabet after it

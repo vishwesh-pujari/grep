@@ -112,18 +112,18 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 		return 0;	
 	}
 
-	regex_t regex;
-	regexStruct compile = regularExpressionCompile(&regex, argv[optind], regexCompilationOption, ignoreCaseOption); // compile the regex. optind -> pattern
+	regex_t regexp;
+	regexStruct compile = regexCompile(&regexp, argv[optind], regexCompilationOption, ignoreCaseOption); // compile the regex. optind -> pattern
 	if (compile.returnValue != 0) { // if regex is invalid
 		fprintf(stderr, "Regex Compilation error : %s\n", compile.errorMessage);
-		regularExpressionDestroy(&regex);
+		regularExpressionDestroy(&regexp);
 		return 0;
 	}
 	regexStruct *matches; // matches will hold the info about matched substring
-	matches = regularExpression(&regex, argv[optind + 1]); // optind + 1 -> string
+	matches = regex(&regexp, argv[optind + 1]); // optind + 1 -> string
 	if (!matches) { // matches is NULL
 		fprintf(stderr, "No Memory\n");
-		regularExpressionDestroy(&regex);
+		regularExpressionDestroy(&regexp);
 		return ENOMEM;
 	}
 	int i, j = 0, k;
@@ -131,7 +131,7 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 	if (matches[0].returnValue != 0) { // no match at all
 		fprintf(stderr, "Regex Matching error : ");
 		fprintf(stderr, "%s\n", matches[0].errorMessage);
-		regularExpressionDestroy(&regex);
+		regularExpressionDestroy(&regexp);
 		free(matches);
 		return 0;
 	}
@@ -150,7 +150,7 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 	}
 	printf("\n");
 
-	regularExpressionDestroy(&regex);
+	regularExpressionDestroy(&regexp);
 	free(matches);
 
 	return 0;
@@ -177,5 +177,9 @@ void initLongOptionsArray(struct option *longoptions, int index, const char *nam
 	longoptions[index].flag = flag;
 	longoptions[index].val = val;
 
+	return;
+}
+
+void setColor(char*colorName) {
 	return;
 }
