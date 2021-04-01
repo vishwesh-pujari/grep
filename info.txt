@@ -1,3 +1,6 @@
+Writing regular expression on my own : https://www.cs.princeton.edu/courses/archive/spr09/cos333/beautiful.html
+https://github.com/swapagarwal/automata-from-regex/blob/master/regex_to_min_dfa.cpp
+
 grep - globally search for regular expression and print out
 
 https://www.geeksforgeeks.org/grep-command-in-unixlinux/
@@ -84,3 +87,6 @@ Replace all words in a particular file with another word. Make use of lseek() fu
 For grep --word-match then 
 in vishwesh(), vishwesh is also a word
 So after every match we shouldn't have any alphabet after it
+
+Searching for multiple patterns:
+https://phoenixnap.com/kb/grep-multiple-strings

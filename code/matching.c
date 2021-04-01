@@ -10,10 +10,10 @@
 
 #define STRING_SIZE 1024
 
-regexStruct regularExpressionHelper(char*, regex_t*);
+regexStruct regexHelper(char*, regex_t*);
 void toLower(char *str); 
 
-regexStruct regularExpressionHelper(char *string, regex_t *regexp) { // matches the regular expression with string and returns structure with info about matches
+regexStruct regexHelper(char *string, regex_t *regexp) { // matches the regular expression with string and returns structure with info about matches
 	
 	//printf("string = %s, pattern = %s\n", string, pattern);
 	//regex_t regexp; // the regular expression
@@ -53,7 +53,7 @@ regexStruct regularExpressionHelper(char *string, regex_t *regexp) { // matches 
 	do {
 		string = address;
 		string = string + offset;
-		retArray[i++] = regularExpressionHelper(pattern, string);
+		retArray[i++] = regexHelper(pattern, string);
 		//printf("retArray[i - 1].end = %d, retArray[i - 1].start = %d, offset = %d\n", retArray[i - 1].end, retArray[i - 1].start, offset);
 		retArray[i - 1].end += offset;
 		retArray[i - 1].start += offset;
@@ -81,7 +81,9 @@ regexStruct *regex(regex_t *regexp, char *string) { // takes a regex and string 
 	int i = 0, offset = 0;
 
 	do {
-		retArray[i++] = regularExpressionHelper(string, regexp); // call the function
+		//printf("string = %s\n", string);
+		//printf("offset = %d\n", offset);
+		retArray[i++] = regexHelper(string, regexp); // call the function
 		//printf("retArray[i - 1].end = %d, retArray[i - 1].start = %d, offset = %d\n", retArray[i - 1].end, retArray[i - 1].start, offset);
 		string = string + retArray[i - 1].end; // increment string to search for more matches in string
 		retArray[i - 1].end += offset; // add offset because we had incremented our string
@@ -96,14 +98,17 @@ regexStruct *regex(regex_t *regexp, char *string) { // takes a regex and string 
 		}
 		
 		if (!strcmp(string, "")) { // if string is empty then to avoid infinite loop as * and ? matches everything so we break
-			//retArray[i].returnValue = -1;
+			retArray[i].returnValue = -1;
 			retArray[i].start = retArray[i].end = -1;
+			i++;
 			break;
 		}
 		
 		if (retArray[i - 1].end != offset - 1) // if the start and end were 0, we had incremented offset, so condition is offset - 1
 			offset = retArray[i - 1].end;
+		//printf("retArray[i - 1].end = %d, retArray[i - 1].start = %d\n", retArray[i - 1].end, retArray[i - 1].start);
 	} while (retArray[i - 1].returnValue == 0); // returnValue == 0 means success
+	retArray[i - 1].start = retArray[i - 1].end = -1;
 
 	return retArray;
 }
@@ -132,18 +137,18 @@ regexStruct regexCompile(regex_t *regexp, char *pattern, int regexCompilationOpt
 	return ret;
 }
 
-void regularExpressionDestroy(regex_t *regexp) {
+void regexDestroy(regex_t *regexp) {
 	regfree(regexp);
 	return;
 }
 
 int *substr(char* str, char* subStr, int ignoreCase) { // this function returns start index of where the substring is found. The end index can be found by strlen(substring)
-	// WARNING: this function modifies the str and subStr passed to it
+
 	int lenStr = strlen(str);
 	int lenSubStr = strlen(subStr);
 	int i, j, k, l = 0;
 
-	char strCopy[STRING_SIZE], subStrCopy[STRING_SIZE];
+	char strCopy[STRING_SIZE], subStrCopy[STRING_SIZE]; // TODO check if we can change STRING_SIZE to lenStr and lenSubStr
 	strcpy(strCopy, str);
 	strcpy(subStrCopy, subStr);
 	

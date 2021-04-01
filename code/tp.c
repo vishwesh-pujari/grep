@@ -2,8 +2,10 @@
 #include <errno.h>
 #include <getopt.h>
 
+char *readLine(char *str, int max, FILE *fp);
+
 int main(int argc, char **argv) {
-	int size = 3, longIndex;
+	/*int size = 3, longIndex;
 	struct option longopts[size];
 	longopts[size - 1].name = "\0"; // last should be zero
 	longopts[size - 1].has_arg = 0;
@@ -37,7 +39,27 @@ int main(int argc, char **argv) {
 
 	printf("%d\n", optind);
 	if (optind == 1 && argc == 1)
-		printf("No flag has been specified\n");
+		printf("No flag has been specified\n");*/
+
+	FILE *fp;
+	fp = fopen(argv[1], "r");
+
+	char line[1024];
+	while (readLine(line, 1024, fp))
+		printf("%s\n", line);
+
+	fclose(fp);
 
 	return 0;
+}
+
+char *readLine(char *str, int max, FILE *fp) {
+	int i;
+	char ch;
+	for (i = 0; i < max - 1 && (ch = fgetc(fp)) != '\n' && ch != EOF; i++)
+		str[i] = ch;
+	str[i] = '\0';
+	if (ch == EOF && i == 0)
+		return NULL;
+	return str;
 }

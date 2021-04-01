@@ -37,3 +37,6 @@ But we can consider another option which tells that consider * as character lite
 
 Solve this Problem : https://stackoverflow.com/questions/981601/colorized-grep-viewing-the-entire-file-with-highlighted-matches
 Here write program like cat and display highlighted text. Also show line numbers. It is like showing matches in context of the file
+
+Grep to replace words in a file
+Also we can give the starting line number to replace

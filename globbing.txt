@@ -1,0 +1,2 @@
+https://www.geeksforgeeks.org/file-globbing-linux/
+See what is nftw() and glob
