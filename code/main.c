@@ -7,7 +7,7 @@
 #include <glob.h> // for glob()
 #include <unistd.h>
 
-#define LONG_OPTIONS_SIZE 6 // the last struct of longoptions must be 0
+#define LONG_OPTIONS_SIZE 10 // the last struct of longoptions must be 0
 
 void printUsage(); // prints the appropriate usage and exits the program
 //int validateNumberOfOptions(int);
@@ -15,9 +15,9 @@ void initLongOpts(struct option *longoptions, int index, const char *name, int h
 
 char *readLine(char*, int, FILE*); // reads line by line from a file
 //int matching(char *filename, char *pattern);
-int fixString(char *filename, char *pattern, char *dir); // for -F option
-int regMatch(char *filename, regex_t regexp, char *dir); // for regular expressions
-void dirWalk(char*, char *, int, char *pattern); // walk through the directory and open appropriate files
+int fixString(char *filename, char *pattern, char *dir, int oneFile); // for -F option
+int regMatch(char *filename, regex_t regexp, char *dir, int oneFile); // for regular expressions
+void dirWalk(char*, char *, int, char *pattern, regex_t regexp); // walk through the directory and open appropriate files
 char* currentDir(char*, int); // returns the directoryname
 
 void green(); // change to green color
@@ -26,7 +26,8 @@ void purple();
 void red();
 void Default(); // change to Default color
 
-int regexCompilation = BASIC_REGEX, ignoreCase = NO_IGNORE_CASE, fixedString = NO_FIXED_STRING; // put default options
+int regexCompilation = BASIC_REGEX, ignoreCase = NO_IGNORE_CASE, fixedString = NO_FIXED_STRING, recusrive = NO_RECURSION; // put default options
+int lineNumber = NO_LINE_NUMBER, onlyFilenames = 0, wordRegexp = 0;
 
 int main(int argc, char **argv) { // To give space seperated command line arg then use " "
 				  // eg, ./a.out "[a-z] [0-9]" "Vishwesh 123"
@@ -42,14 +43,18 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 	initLongOpts(longoptions, 2, "ignore-case", no_argument, NULL, 'i');
 	initLongOpts(longoptions, 3, "no-ignore-case", no_argument, NULL, 0); // --no-ignore-case doesn't have any short hand option.
 	initLongOpts(longoptions, 4, "fixed-string", no_argument, NULL, 'F');
-	initLongOpts(longoptions, 5, "", 0, NULL, 0); // last struct must be initialised with 0	
+	initLongOpts(longoptions, 5, "recursive", no_argument, NULL, 'r');
+	initLongOpts(longoptions, 6, "line-number", no_argument, NULL, 'n');
+	initLongOpts(longoptions, 7, "files-with-matched", no_argument, NULL, 'l');
+	initLongOpts(longoptions, 8, "word-regexp", no_argument, NULL, 'w');
+	initLongOpts(longoptions, 9, "", 0, NULL, 0); // last struct must be initialised with 0	
 
 	// The getopt_long() function works like getopt() except that it also accepts long options, started with two dashes
 	// long option starts with -- and short option with -
 	// if flag is NULL, then getopt_long() returns val.  (For example, the  calling  program may  set  val  to the equivalent short option character.)
 
 	// --ignore-case and --no-ignore-case can be used both at a time. The one who is second is taken into consideration 
-	while ((option = getopt_long(argc, argv, "GEiF", longoptions, &longIndex)) != -1) { // until no more options are left
+	while ((option = getopt_long(argc, argv, "GEiFrnlw", longoptions, &longIndex)) != -1) { // until no more options are left
 		//printf("option = %d, longIndex = %d\n", option, longIndex);
 		switch (option) {
 			case 'G':
@@ -77,6 +82,22 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 				fixedString = FIXED_STRING;
 				break;
 
+			case 'r':
+				recusrive = RECURSION;
+				break;
+
+			case 'n':
+				lineNumber = LINE_NUMBER;
+				break;
+
+			case 'l':
+				onlyFilenames = 1;
+				break;
+
+			case 'w':
+				wordRegexp = 1;
+				break;
+
 			case '\0': // option will hold value 0 when the long option doesn't have any equivalent short option
 				if (!strcmp(longoptions[longIndex].name, "no-ignore-case"))
 					ignoreCase = NO_IGNORE_CASE;
@@ -87,16 +108,10 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 		}
 	}
 
-	/*if (!validateNumberOfOptions(argc)) // if number of arguments is not valid
-		printUsage();*/
-
 	// optind holds index of first non-option argument in argv
 	// getopt_long modifies argv. It brings all flags to left of argv and all non-flag args to the right
 
-	/*if (optind == 1) // no option is specified. If some option is specified then optind must be minimum 2
-		regexCompilation = BASIC_REGEX; // default*/	
-
-	if (argc - optind < 2) // argc - optind must be 2, then only we will get "PATTERN" and "STRING" both
+	if (argc - optind < 1) // argc - optind must be 2, then only we will get "PATTERN" and "STRING" both
 				// if argc - optind is less than 2 it indicates more number of options, and greater than 2 indicates more strings and patterns
 	       printUsage();
 
@@ -117,14 +132,44 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 	regMatch(argv[optind + 1], regexp);
 	regexDestroy(&regexp);*/
 
-	int i, lenArgv;
-	int j = optind + 1;
+	regex_t regexp;
+	regexStruct compile;
+	if (fixedString != FIXED_STRING) {
+		compile = regexCompile(&regexp, argv[optind], regexCompilation, ignoreCase); // compile the regex. optind -> pattern
+		if (compile.returnValue != 0) { // if regex is invalid
+			fprintf(stderr, "Regex Compilation error : %s\n", compile.errorMessage);
+			regexDestroy(&regexp);
+			return 0;
+		}
+	}
+
+	int i, lenArgv, j = optind + 1, oneFile = 0, ret; // when oneFile = 1 then we dont have to print the filename
+
+	if (j == argc - 1)
+		oneFile = 1;
+
+	if (argc - optind == 1) { // only pattern is mentioned and file isn't mentioned then take input from stdin
+		if (fixedString == FIXED_STRING)
+			fixString("-", argv[optind], NULL, 1);
+		else // Regex Matching here
+			regMatch("-", regexp, NULL, 1);
+	}
+
+	char thisDir[1024];
+	getcwd(thisDir, sizeof(thisDir));
+
 	for (; j < argc; j++) {
 		lenArgv = strlen(argv[j]);
+
+		if (argv[j][lenArgv - 1] == '/') { // if last character of path is a '/'
+			argv[j][lenArgv - 1] = '\0';
+			lenArgv--;
+		}
+
 		for (i = lenArgv - 1; i >= 0; i--)
 			if (argv[j][i] == '/')
 				break;
-		
+
 		char str[1024];
 		if (i == -1)
 			getcwd(str, sizeof(str)); // store current directory name in str
@@ -135,143 +180,40 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 		chdir(str);
 		//printf("argv[j] + i + 1 = %s, str = %s\n", argv[j] + i + 1, str);
 		//dirWalk(argv[j] + i + 1, str, i, argv[optind]);
-		if (fixedString == FIXED_STRING)
-			fixString(argv[j] + i + 1, argv[optind], currentDir(str, i));
-		else {
-			// Regex Matching here
-			regex_t regexp;
-			regexStruct compile;
-			compile = regexCompile(&regexp, argv[optind], regexCompilation, ignoreCase); // compile the regex. optind -> pattern
-			if (compile.returnValue != 0) { // if regex is invalid
-				fprintf(stderr, "Regex Compilation error : %s\n", compile.errorMessage);
-				regexDestroy(&regexp);
-				return 0;
-			}
-			regMatch(argv[j] + i + 1, regexp, currentDir(str, i));
-			regexDestroy(&regexp);
-		}
-	}
 
-
-
-
-
-
-
-
-
-
-
-
-	/*FILE *fp = fopen(argv[optind + 1], "r"); // 1. filename
-	char line[1024];
-
-	if (fp == NULL) {
-		printf("%s\n", argv[optind + 1]);
-		perror("");
-		return EINVAL;
-	}
-	
-	if (fixedString == FIXED_STRING) { // 2. fixedString
-		int lenSubStr = strlen(argv[optind]); // 3. pattern
-		int *matches, i, j, k;
-		
-		while (readLine(line, 1024, fp)) {
-			matches = substr(line, argv[optind], ignoreCase), j = 0; // 4. ignoreCase
-			if (!matches) {
-				fprintf(stderr, "No Memory\n");
-				return ENOMEM;
-			}
-			if (matches[0] == -1) {
-				//fprintf(stderr, "No Match\n");
-				//return 0;
-				free(matches);
-				continue;
-			}
-			for (i = 0; line[i]; i++) {
-				if (matches[j] != i) // print normally
-					printf("%c", line[i]);
-				else {
-					printf("\033[0;33m"); // yellow color
-					for (k = matches[j]; k < matches[j] + lenSubStr; k++) // print the matched substring
-						printf("%c", line[k]);
-					i = k - 1;
-					j++; // go to the next match
-					printf("\033[0m"); // set color to normal
-				}
-			}
-			printf("\n");
-			
-			free(matches);
-		}
-		fclose(fp);
-		return 0;	
-	}
-
-	regex_t regexp;
-	regexStruct compile; // 5. regexCompilation
-	compile = regexCompile(&regexp, argv[optind], regexCompilation, ignoreCase); // compile the regex. optind -> pattern
-	if (compile.returnValue != 0) { // if regex is invalid
-		fprintf(stderr, "Regex Compilation error : %s\n", compile.errorMessage);
-		regexDestroy(&regexp);
-		return 0;
-	}
-	regexStruct *matches; // matches will hold the info about matched substring
-
-	while (readLine(line, 1024, fp)) {
-		//matches = regex(&regexp, argv[optind + 1]); // optind + 1 -> string
-		matches = regex(&regexp, line);
-		
-		if (!matches) { // matches is NULL
-			fprintf(stderr, "No Memory\n");
-			regexDestroy(&regexp);
-			fclose(fp);
-			return ENOMEM;
-		}
-		int i, j = 0, k;
-
-		if (matches[0].returnValue != 0) { // no match at all
-			//fprintf(stderr, "Regex Matching error : ");
-			//fprintf(stderr, "%s\n", matches[0].errorMessage);
-			//regexDestroy(&regexp);
-			//free(matches);
-			//return 0;
-			free(matches);
-			continue;
-		}
-		//int l;
-		//for (l = 0; matches[l].returnValue == 0; l++)
-		//	printf("matches[l].start = %d, matches[l].end = %d\n", matches[l].start, matches[l].end);
-		//printf("matches[l].start = %d, matches[l].end = %d\n", matches[l].start, matches[l].end);
-		//l++;
-		//printf("matches[l].start = %d, matches[l].end = %d\n", matches[l].start, matches[l].end);
-		//printf("line=%s, pattern=%s\n", line, argv[optind]);
- 
-		for (i = 0; line[i]; i++) {
-			//printf("line = %s\n", line);
-			if (matches[j].start != i) // print normally
-				printf("%c", line[i]);
+		ret = chdir(argv[j] + i + 1);
+		if (ret == 0) { // argv[j] + i + 1 is a directory
+			// directory has been changed
+			if (recusrive == RECURSION)
+				dirWalk("*", str, i, argv[optind], regexp);
 			else {
-				printf("\033[0;33m"); // yellow color
-				for (k = matches[j].start; k < matches[j].end; k++) // print the matched substring
-					printf("%c", line[k]);
-				i = k - 1;
-				j++; // go to the next match
-				printf("\033[0m"); // set color to normal
+				char* currDir = currentDir(str, i);
+				if (currDir[0] != '\0')
+					printf("grep: %s is a directory\n", currDir);
+				//printf("%s:", argv[j] + i + 1);
+				free(currDir);
 			}
+			chdir("..");
+		} else { // argv[j] + i + 1 is a file
+			if (fixedString == FIXED_STRING)
+				fixString(argv[j] + i + 1, argv[optind], currentDir(str, i), oneFile);
+			else // Regex Matching here
+				regMatch(argv[j] + i + 1, regexp, currentDir(str, i), oneFile);
 		}
-		printf("\n");
-		free(matches);
-		regexDestroy(&regexp);
-		regexCompile(&regexp, argv[optind], regexCompilation, ignoreCase); // compile the regex again because while matching the previous string, regex.h modifies this regex
+		chdir(thisDir); // as we had changed directory we set back to original here
 	}
-
-	fclose(fp);*/
+	if (fixedString != FIXED_STRING)
+		regexDestroy(&regexp);
 	return 0;
 }
 
-int fixString(char *filename, char *pattern, char *dir) {
-	FILE *fp = fopen(filename, "r"); // 1. filename
+int fixString(char *filename, char *pattern, char *dir, int oneFile) { // oneFile = 1 if user has entered only one file in cmd arg
+	
+	FILE* fp;
+	if (!strcmp(filename, "-"))
+		fp = stdin;
+	else
+		fp = fopen(filename, "r"); // 1. filename
 	char line[1024];
 
 	if (fp == NULL) {
@@ -281,10 +223,11 @@ int fixString(char *filename, char *pattern, char *dir) {
 	}
 	
 	int lenSubStr = strlen(pattern); // 3. pattern
-	int *matches, i, j, k;
+	int *matches, i, j, k, lineCount = 0;
 	
 	while (readLine(line, 1024, fp)) {
-		matches = substr(line, pattern, ignoreCase), j = 0; // 4. ignoreCase
+		lineCount++;
+		matches = substr(line, pattern, ignoreCase, wordRegexp), j = 0; // 4. ignoreCase
 		if (!matches) {
 			fprintf(stderr, "No Memory\n");
 			return ENOMEM;
@@ -295,11 +238,39 @@ int fixString(char *filename, char *pattern, char *dir) {
 			free(matches);
 			continue;
 		}
+
+		// when control comes here it means that there is a match
+
+		if (onlyFilenames) {
+			
+			if (fp == stdin)
+				printf("(standard input)\n");
+			else {
+				if (dir[0] != '\0')
+					printf("%s", dir);
+				printf("%s\n", filename);
+			}
+			return 0;
+		}
+
 		purple();
-		if (dir[0] != '\0')
-			printf("%s", dir);
-		printf("%s:", filename);
+		if (oneFile != 1) { // if multiple files are sent by user
+			if (fp == stdin)
+				printf("(standard input):");
+			else {
+				if (dir[0] != '\0')
+					printf("%s", dir);
+				printf("%s:", filename);
+			}
+		}
 		Default();
+
+		if (lineNumber == LINE_NUMBER) {
+			green();
+			printf("%d:", lineCount);
+			Default();
+		}
+
 		for (i = 0; line[i]; i++) {
 			if (matches[j] != i) // print normally
 				printf("%c", line[i]);
@@ -320,8 +291,12 @@ int fixString(char *filename, char *pattern, char *dir) {
 	return 0;
 }
 
-int regMatch(char *filename, regex_t regexp, char *dir) {
-	FILE *fp = fopen(filename, "r"); // 1. filename
+int regMatch(char *filename, regex_t regexp, char *dir, int oneFile) {
+	FILE* fp;
+	if (!strcmp(filename, "-"))
+		fp = stdin;
+	else
+		fp = fopen(filename, "r"); // 1. filename
 	char line[1024];
 
 	if (fp == NULL) {
@@ -340,9 +315,13 @@ int regMatch(char *filename, regex_t regexp, char *dir) {
 	}*/
 
 	regexStruct *matches; // matches will hold the info about matched substring
+
+	int lineCount = 0;
+
 	while (readLine(line, 1024, fp)) {
+		lineCount++;
 		//matches = regex(&regexp, argv[optind + 1]); // optind + 1 -> string
-		matches = regex(&regexp, line);
+		matches = regex(&regexp, line, wordRegexp);
 		
 		if (!matches) { // matches is NULL
 			fprintf(stderr, "No Memory\n");
@@ -361,11 +340,40 @@ int regMatch(char *filename, regex_t regexp, char *dir) {
 			free(matches);
 			continue;
 		}
+
+		// when control comes here it means that there is a match
+
+		if (onlyFilenames) {
+			purple();
+			if (fp == stdin)
+				printf("(standard input)\n");
+			else {
+				if (dir[0] != '\0')
+					printf("%s", dir);
+				printf("%s\n", filename);
+			}
+			Default();
+			return 0;
+		}
+
 		purple(); // green color
-		if (dir[0] != '\0')
-			printf("%s", dir);
-		printf("%s:", filename);
+		if (oneFile != 1) {
+			if (fp == stdin)
+				printf("(standard input):");
+			else {
+				if (dir[0] != '\0')
+					printf("%s", dir);
+				printf("%s:", filename);
+			}
+		}
 		Default();
+
+		if (lineNumber == LINE_NUMBER) {
+			green();
+			printf("%d:", lineCount);
+			Default();
+		}
+
 		for (i = 0; line[i]; i++) {
 			if (matches[j].start != i) // print normally
 				printf("%c", line[i]);
@@ -375,7 +383,7 @@ int regMatch(char *filename, regex_t regexp, char *dir) {
 					printf("%c", line[k]);
 				i = k - 1;
 				j++; // go to the next match
-				printf("\033[0m"); // set color to normal
+				Default(); // set color to normal
 			}
 		}
 		printf("\n");
@@ -393,7 +401,7 @@ char *currentDir(char *str, int j) {
    char *retStr;
    retStr = (char*) calloc(1024, sizeof(char));
    if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        int *matches = substr(cwd, str, NO_IGNORE_CASE);
+        int *matches = substr(cwd, str, NO_IGNORE_CASE, 0);
         int i = 0;
         while (matches[i] != -1) // find the last match
             i++;
@@ -405,10 +413,8 @@ char *currentDir(char *str, int j) {
 				//printf("%s\n", cwd + dirLength + strlen(str) + 1);
 			}
             // if equal then we don't print
-        } else {
+        } else
             sprintf(retStr, "%s/", cwd + dirLength);
-			printf("cwd + dirLength = %s\n", cwd + dirLength);
-		}
    } else {
        perror("getcwd() error");
        return NULL;
@@ -416,7 +422,7 @@ char *currentDir(char *str, int j) {
    return retStr;
 }
 
-void dirWalk(char *filePattern, char *str, int j, char *pattern) {
+void dirWalk(char *filePattern, char *str, int j, char *pattern, regex_t regexp) {
     glob_t paths; // this structure will hold all information about matched filenames
     int retval, ret;
     
@@ -432,7 +438,7 @@ void dirWalk(char *filePattern, char *str, int j, char *pattern) {
             ret = chdir(paths.gl_pathv[i]);
             if (ret == 0) { // means paths.gl_pathv[i] is a directory
                 //currentDir();
-                //dirWalk(filePattern, str, j); // This now works according to the changed directory
+                dirWalk(filePattern, str, j, pattern, regexp); // This now works according to the changed directory
                 //chdir(".."); // Setting back the direectory to original
                 //currentDir();
 				chdir("..");
@@ -440,20 +446,9 @@ void dirWalk(char *filePattern, char *str, int j, char *pattern) {
                 //currentDir(str, j);
 				//printf("%s\n", paths.gl_pathv[i]);
 				if (fixedString == FIXED_STRING)
-					fixString(paths.gl_pathv[i], pattern, currentDir(str, j));
-				else {
-					// Regex Matching here
-					regex_t regexp;
-					regexStruct compile;
-					compile = regexCompile(&regexp, pattern, regexCompilation, ignoreCase); // compile the regex. optind -> pattern
-					if (compile.returnValue != 0) { // if regex is invalid
-						fprintf(stderr, "Regex Compilation error : %s\n", compile.errorMessage);
-						regexDestroy(&regexp);
-						return;
-					}
-					regMatch(paths.gl_pathv[i], regexp, currentDir(str, j));
-					regexDestroy(&regexp);
-				}
+					fixString(paths.gl_pathv[i], pattern, currentDir(str, j), 0);
+				else
+					regMatch(paths.gl_pathv[i], regexp, currentDir(str, j), 0);
 			}
         }
         globfree( &paths );
@@ -463,120 +458,13 @@ void dirWalk(char *filePattern, char *str, int j, char *pattern) {
     return;
 }
 
-/*int matching(char *filename, char *pattern) {
-	FILE *fp = fopen(filename, "r"); // 1. filename
-	char line[1024];
-
-	if (fp == NULL) {
-		printf("%s\n", filename);
-		perror("");
-		return EINVAL;
-	}
-	
-	if (fixedString == FIXED_STRING) { // 2. fixedString
-		int lenSubStr = strlen(pattern); // 3. pattern
-		int *matches, i, j, k;
-		
-		while (readLine(line, 1024, fp)) {
-			matches = substr(line, pattern, ignoreCase), j = 0; // 4. ignoreCase
-			if (!matches) {
-				fprintf(stderr, "No Memory\n");
-				return ENOMEM;
-			}
-			if (matches[0] == -1) {
-				//fprintf(stderr, "No Match\n");
-				//return 0;
-				free(matches);
-				continue;
-			}
-			for (i = 0; line[i]; i++) {
-				if (matches[j] != i) // print normally
-					printf("%c", line[i]);
-				else {
-					printf("\033[0;33m"); // yellow color
-					for (k = matches[j]; k < matches[j] + lenSubStr; k++) // print the matched substring
-						printf("%c", line[k]);
-					i = k - 1;
-					j++; // go to the next match
-					printf("\033[0m"); // set color to normal
-				}
-			}
-			printf("\n");
-			
-			free(matches);
-		}
-		fclose(fp);
-		return 0;	
-	}
-
-	regex_t regexp;
-	regexStruct compile; // 5. regexCompilation
-	compile = regexCompile(&regexp, pattern, regexCompilation, ignoreCase); // compile the regex. optind -> pattern
-	if (compile.returnValue != 0) { // if regex is invalid
-		fprintf(stderr, "Regex Compilation error : %s\n", compile.errorMessage);
-		regexDestroy(&regexp);
-		fclose(fp);
-		return 0;
-	}
-	regexStruct *matches; // matches will hold the info about matched substring
-
-	while (readLine(line, 1024, fp)) {
-		//matches = regex(&regexp, argv[optind + 1]); // optind + 1 -> string
-		matches = regex(&regexp, line);
-		
-		if (!matches) { // matches is NULL
-			fprintf(stderr, "No Memory\n");
-			regexDestroy(&regexp);
-			fclose(fp);
-			return ENOMEM;
-		}
-		int i, j = 0, k;
-
-		if (matches[0].returnValue != 0) { // no match at all
-			//fprintf(stderr, "Regex Matching error : ");
-			//fprintf(stderr, "%s\n", matches[0].errorMessage);
-			//regexDestroy(&regexp);
-			//free(matches);
-			//return 0;
-			free(matches);
-			continue;
-		}
-
-		for (i = 0; line[i]; i++) {
-			if (matches[j].start != i) // print normally
-				printf("%c", line[i]);
-			else {
-				printf("\033[0;33m"); // yellow color
-				for (k = matches[j].start; k < matches[j].end; k++) // print the matched substring
-					printf("%c", line[k]);
-				i = k - 1;
-				j++; // go to the next match
-				printf("\033[0m"); // set color to normal
-			}
-		}
-		printf("\n");
-		free(matches);
-		regexDestroy(&regexp);
-		regexCompile(&regexp, pattern, regexCompilation, ignoreCase); // compile the regex again because while matching the previous string, regex.h modifies this regex
-	}
-	regexDestroy(&regexp);
-	fclose(fp);
-	return 0;
-}*/
-
 void printUsage() { // This function prints the appropriate usage and exits from the program
-	fprintf(stderr, "usage : ./grep [OPTIONS] \"PATTERN\" \"FILENAME\"\n");
+	fprintf(stderr, "usage : ./grep [OPTIONS] \"PATTERN\" \"FILENAME1\" \"FILENAME2\" ...\n");
 	fprintf(stderr, "[OPTIONS] : -G,--basic-regexp (default) | -E,--extended-regexp | -F,--fixed-string\n"); // | indicates OR
 	fprintf(stderr, "          : -i,--ignore-case\n");
 	fprintf(stderr, "          : --no-ignore-case (default)\n");
 	exit(EINVAL);
 }
-
-/*int validateNumberOfOptions(int argc) {
-	if (argc >= 3 && argc <= 5)
-		return 1;
-	return 0;
-}*/
 
 void initLongOpts(struct option *longoptions, int index, const char *name, int has_arg, int *flag, int val) {
 	

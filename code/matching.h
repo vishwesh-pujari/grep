@@ -8,7 +8,11 @@ enum {
 	IGNORE_CASE,
 	NO_IGNORE_CASE,
 	NO_FIXED_STRING,
-	FIXED_STRING
+	FIXED_STRING,
+	NO_RECURSION,
+	RECURSION,
+	NO_LINE_NUMBER,
+	LINE_NUMBER
 };
 
 #define ERROR_SIZE 1024
@@ -19,8 +23,8 @@ typedef struct regexStruct {
 	int end; // ending value of the matched substring (exclusive)
 }regexStruct;
 
-regexStruct* regex(regex_t*, char*);
+regexStruct* regex(regex_t*, char*, int wordRegexp);
 regexStruct regexCompile(regex_t*, char*, int, int);
 void regexDestroy(regex_t*);
 
-int *substr(char*, char*, int); // this function returns start index of where the substring is found. The end index can be found by strlen(substring)
+int *substr(char*, char*, int, int wordRegexp); // this function returns start index of where the substring is found. The end index can be found by strlen(substring)

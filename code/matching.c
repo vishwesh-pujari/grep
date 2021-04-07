@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include "matching.h"
 
 #define STRING_SIZE 1024
@@ -37,6 +38,7 @@ regexStruct regexHelper(char *string, regex_t *regexp) { // matches the regular 
 	if (returnValue == 0) { // if match is found
 		retStruct.start = pmatch[0].rm_so; // so stands for start of
 		retStruct.end = pmatch[0].rm_eo; // eo stands for end of
+		//printf("so = %d, eo = %d\n", pmatch[0].rm_so, pmatch[0].rm_eo);
 	} else if (returnValue == REG_NOMATCH) {
 		regerror(returnValue, regexp, retStruct.errorMessage, ERROR_SIZE); // Store the error in the errorMessage String
 		retStruct.returnValue = returnValue;
@@ -72,27 +74,48 @@ regexStruct regexHelper(char *string, regex_t *regexp) { // matches the regular 
 	return retArray;
 }*/
 
-regexStruct *regex(regex_t *regexp, char *string) { // takes a regex and string and returns an array of structs containing info about matches	
+regexStruct *regex(regex_t *regexp, char *string, int wordRegexp) { // takes a regex and string and returns an array of structs containing info about matches	
 	regexStruct *retArray;
 	retArray = (regexStruct*) malloc(sizeof(regexStruct)); // this retArray contains information about all the matched substring
 	if (!retArray)
 		return NULL;
 	
-	int i = 0, offset = 0;
+	int i = 0, offset = 0, flag, tempStart, tempEnd, tempRet;
+	char* temp = string;
 
 	do {
+		flag = 1;
 		//printf("string = %s\n", string);
 		//printf("offset = %d\n", offset);
 		retArray[i++] = regexHelper(string, regexp); // call the function
+		//printf("%d %d %d\n", retArray[i - 1].returnValue, retArray[i - 1].start, retArray[i - 1].end);
+
 		//printf("retArray[i - 1].end = %d, retArray[i - 1].start = %d, offset = %d\n", retArray[i - 1].end, retArray[i - 1].start, offset);
 		string = string + retArray[i - 1].end; // increment string to search for more matches in string
 		retArray[i - 1].end += offset; // add offset because we had incremented our string
 		retArray[i - 1].start += offset;
-		retArray = (regexStruct*) realloc(retArray, (i + 1) * sizeof(regexStruct)); // increase the retArray by 1
-		if (!retArray)
-			return retArray;
+
+		//printf("%d %d %d\n", retArray[i - 1].returnValue, retArray[i - 1].start, retArray[i - 1].end);
+
+		tempStart = retArray[i - 1].start;
+		tempEnd = retArray[i - 1].end;
+		tempRet = retArray[i - 1].returnValue;
+
+		if (wordRegexp == 1 && retArray[i - 1].returnValue == 0) { // 2nd condition says that some match occured
+
+			if ((isalnum(temp[retArray[i - 1].end]) || temp[retArray[i - 1].end] == '_') || (retArray[i - 1].start != 0 && (isalnum(temp[retArray[i - 1].start - 1]) || temp[retArray[i - 1].start - 1] == '_'))) {
+				flag = 0;
+				i--;
+			}
+		}
+		//printf("string = %s\n", string);
+		if (flag) {
+			retArray = (regexStruct*) realloc(retArray, (i + 1) * sizeof(regexStruct)); // increase the retArray by 1
+			if (!retArray)
+				return retArray;
+		}
 		
-		if (retArray[i - 1].start == offset && retArray[i - 1].end == offset) { // if start and end are 0
+		if (tempStart == offset && tempEnd == offset) { // if start and end are 0
 			offset++;
 			string += 1;
 		}
@@ -104,10 +127,10 @@ regexStruct *regex(regex_t *regexp, char *string) { // takes a regex and string 
 			break;
 		}
 		
-		if (retArray[i - 1].end != offset - 1) // if the start and end were 0, we had incremented offset, so condition is offset - 1
-			offset = retArray[i - 1].end;
+		if (tempEnd != offset - 1) // if the start and end were 0, we had incremented offset, so condition is offset - 1
+			offset = tempEnd;
 		//printf("retArray[i - 1].end = %d, retArray[i - 1].start = %d\n", retArray[i - 1].end, retArray[i - 1].start);
-	} while (retArray[i - 1].returnValue == 0); // returnValue == 0 means success
+	} while (tempRet == 0); // returnValue == 0 means success. flag is set to 0 when retArray[i - 1].returnValue == 0 and sometimes we decrement i. Hence to avoid accessing invalid location we do flag == 0
 	retArray[i - 1].start = retArray[i - 1].end = -1;
 
 	return retArray;
@@ -142,11 +165,11 @@ void regexDestroy(regex_t *regexp) {
 	return;
 }
 
-int *substr(char* str, char* subStr, int ignoreCase) { // this function returns start index of where the substring is found. The end index can be found by strlen(substring)
+int *substr(char* str, char* subStr, int ignoreCase, int wordRegexp) { // this function returns start index of where the substring is found. The end index can be found by strlen(substring)
 
 	int lenStr = strlen(str);
 	int lenSubStr = strlen(subStr);
-	int i, j, k, l = 0;
+	int i, j, k, l = 0, flag;
 
 	char strCopy[STRING_SIZE], subStrCopy[STRING_SIZE]; // TODO check if we can change STRING_SIZE to lenStr and lenSubStr
 	strcpy(strCopy, str);
@@ -168,6 +191,7 @@ int *substr(char* str, char* subStr, int ignoreCase) { // this function returns 
 	}
 	
 	for (i = 0; strCopy[i]; i++) {
+		flag = 1;
 		if (subStrCopy[0] == '\0') { // empty string matches everything
 			matches[l++] = i;
 			matches = (int*) realloc(matches, (l + 1) * sizeof(int));
@@ -179,9 +203,33 @@ int *substr(char* str, char* subStr, int ignoreCase) { // this function returns 
 			for (; subStrCopy[k] && strCopy[j] && (strCopy[j] == subStrCopy[k]); k++, j++);
 			if (subStrCopy[k] == '\0') {
 				matches[l++] = i;
-				matches = (int*) realloc(matches, (l + 1) * sizeof(int));
-				if (!matches)
-					return NULL;
+
+				if (wordRegexp == 1) {
+					int start = matches[l - 1];
+					int end = start + lenSubStr;
+					//printf("start = %d, end = %d", start, end);
+					//printf("%c\n", strCopy[start - 1]);
+					
+					if ((isalnum(strCopy[end]) || strCopy[end] == '_') || (start != 0 && (isalnum(strCopy[start - 1]) || strCopy[start - 1] == '_'))) {
+						//printf("I am here\n");
+						flag = 0;
+						l--;
+					}
+
+
+					/*if (((strCopy[end] < 'A' && strCopy[end] > 'Z') && (strCopy[end] < 'a' && strCopy[end] > 'z')) && (start == 0 || (strCopy[start - 1] < 'A' && strCopy[start - 1] > 'Z') && (strCopy[start - 1] < 'a' && strCopy[start - 1] > 'z'))) {
+						// do nothing
+					} else {
+						flag = 0;
+						l--;
+					}*/
+				}
+
+				if (flag) {
+					matches = (int*) realloc(matches, (l + 1) * sizeof(int));
+					if (!matches)
+						return NULL;
+				}
 				i = j - 1;
 			}
 		}
