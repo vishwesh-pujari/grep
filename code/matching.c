@@ -74,7 +74,7 @@ regexStruct regexHelper(char *string, regex_t *regexp) { // matches the regular 
 	return retArray;
 }*/
 
-regexStruct *regex(regex_t *regexp, char *string, int wordRegexp) { // takes a regex and string and returns an array of structs containing info about matches	
+regexStruct *regex(regex_t *regexp, char *string, int wordRegexp, int lineRegexp) { // takes a regex and string and returns an array of structs containing info about matches	
 	regexStruct *retArray;
 	retArray = (regexStruct*) malloc(sizeof(regexStruct)); // this retArray contains information about all the matched substring
 	if (!retArray)
@@ -100,6 +100,13 @@ regexStruct *regex(regex_t *regexp, char *string, int wordRegexp) { // takes a r
 		tempStart = retArray[i - 1].start;
 		tempEnd = retArray[i - 1].end;
 		tempRet = retArray[i - 1].returnValue;
+
+		if (lineRegexp == 1 && tempRet == 0) {
+			if (tempStart != 0 || temp[tempEnd] != '\0') {
+				retArray[i - 1].returnValue = -1;
+				break;
+			}
+		}
 
 		if (wordRegexp == 1 && retArray[i - 1].returnValue == 0) { // 2nd condition says that some match occured
 
@@ -165,7 +172,7 @@ void regexDestroy(regex_t *regexp) {
 	return;
 }
 
-int *substr(char* str, char* subStr, int ignoreCase, int wordRegexp) { // this function returns start index of where the substring is found. The end index can be found by strlen(substring)
+int *substr(char* str, char* subStr, int ignoreCase, int wordRegexp, int lineRegexp) { // this function returns start index of where the substring is found. The end index can be found by strlen(substring)
 
 	int lenStr = strlen(str);
 	int lenSubStr = strlen(subStr);
@@ -204,6 +211,16 @@ int *substr(char* str, char* subStr, int ignoreCase, int wordRegexp) { // this f
 			if (subStrCopy[k] == '\0') {
 				matches[l++] = i;
 
+				if (lineRegexp == 1) {
+					int start = matches[l - 1];
+					int end = start + lenSubStr;
+
+					if (start != 0 || strCopy[end] != '\0') {
+						l--;
+						break;
+					}
+				}
+				
 				if (wordRegexp == 1) {
 					int start = matches[l - 1];
 					int end = start + lenSubStr;
@@ -215,14 +232,6 @@ int *substr(char* str, char* subStr, int ignoreCase, int wordRegexp) { // this f
 						flag = 0;
 						l--;
 					}
-
-
-					/*if (((strCopy[end] < 'A' && strCopy[end] > 'Z') && (strCopy[end] < 'a' && strCopy[end] > 'z')) && (start == 0 || (strCopy[start - 1] < 'A' && strCopy[start - 1] > 'Z') && (strCopy[start - 1] < 'a' && strCopy[start - 1] > 'z'))) {
-						// do nothing
-					} else {
-						flag = 0;
-						l--;
-					}*/
 				}
 
 				if (flag) {

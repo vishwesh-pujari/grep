@@ -23,8 +23,8 @@ typedef struct regexStruct {
 	int end; // ending value of the matched substring (exclusive)
 }regexStruct;
 
-regexStruct* regex(regex_t*, char*, int wordRegexp);
+regexStruct* regex(regex_t*, char*, int wordRegexp, int lineRegexp);
 regexStruct regexCompile(regex_t*, char*, int, int);
 void regexDestroy(regex_t*);
 
-int *substr(char*, char*, int, int wordRegexp); // this function returns start index of where the substring is found. The end index can be found by strlen(substring)
+int *substr(char*, char*, int, int wordRegexp, int lineRegexp); // this function returns start index of where the substring is found. The end index can be found by strlen(substring)

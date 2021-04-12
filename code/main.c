@@ -7,7 +7,7 @@
 #include <glob.h> // for glob()
 #include <unistd.h>
 
-#define LONG_OPTIONS_SIZE 10 // the last struct of longoptions must be 0
+#define LONG_OPTIONS_SIZE 16 // the last struct of longoptions must be 0
 
 void printUsage(); // prints the appropriate usage and exits the program
 //int validateNumberOfOptions(int);
@@ -27,7 +27,8 @@ void red();
 void Default(); // change to Default color
 
 int regexCompilation = BASIC_REGEX, ignoreCase = NO_IGNORE_CASE, fixedString = NO_FIXED_STRING, recusrive = NO_RECURSION; // put default options
-int lineNumber = NO_LINE_NUMBER, onlyFilenames = 0, wordRegexp = 0;
+int lineNumber = NO_LINE_NUMBER, onlyFilenames = 0, wordRegexp = 0, lineRegexp = 0, invertMatch = 0, filesWithoutMatch = 0, count = 0;
+int noFileName = 0, withFileName = 0;
 
 int main(int argc, char **argv) { // To give space seperated command line arg then use " "
 				  // eg, ./a.out "[a-z] [0-9]" "Vishwesh 123"
@@ -45,16 +46,22 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 	initLongOpts(longoptions, 4, "fixed-string", no_argument, NULL, 'F');
 	initLongOpts(longoptions, 5, "recursive", no_argument, NULL, 'r');
 	initLongOpts(longoptions, 6, "line-number", no_argument, NULL, 'n');
-	initLongOpts(longoptions, 7, "files-with-matched", no_argument, NULL, 'l');
+	initLongOpts(longoptions, 7, "files-with-matches", no_argument, NULL, 'l');
 	initLongOpts(longoptions, 8, "word-regexp", no_argument, NULL, 'w');
-	initLongOpts(longoptions, 9, "", 0, NULL, 0); // last struct must be initialised with 0	
+	initLongOpts(longoptions, 9, "line-regexp", no_argument, NULL, 'x');
+	initLongOpts(longoptions, 10, "invert-match", no_argument, NULL, 'v');
+	initLongOpts(longoptions, 11, "files-without-match", no_argument, NULL, 'L');
+	initLongOpts(longoptions, 12, "count", no_argument, NULL, 'c');
+	initLongOpts(longoptions, 13, "no-filename", no_argument, NULL, 'h');
+	initLongOpts(longoptions, 14, "with-filename", no_argument, NULL, 'H');
+	initLongOpts(longoptions, 15, "", 0, NULL, 0); // last struct must be initialised with 0	
 
 	// The getopt_long() function works like getopt() except that it also accepts long options, started with two dashes
 	// long option starts with -- and short option with -
 	// if flag is NULL, then getopt_long() returns val.  (For example, the  calling  program may  set  val  to the equivalent short option character.)
 
 	// --ignore-case and --no-ignore-case can be used both at a time. The one who is second is taken into consideration 
-	while ((option = getopt_long(argc, argv, "GEiFrnlw", longoptions, &longIndex)) != -1) { // until no more options are left
+	while ((option = getopt_long(argc, argv, "GEiFrnlwxvLchH", longoptions, &longIndex)) != -1) { // until no more options are left
 		//printf("option = %d, longIndex = %d\n", option, longIndex);
 		switch (option) {
 			case 'G':
@@ -92,10 +99,38 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 
 			case 'l':
 				onlyFilenames = 1;
+				filesWithoutMatch = 0;
 				break;
 
-			case 'w':
-				wordRegexp = 1;
+			case 'w': // -w has no effect if -x is specified
+				if (lineRegexp != 1)
+					wordRegexp = 1;
+				break;
+
+			case 'x':
+				wordRegexp = 0;
+				lineRegexp = 1;
+				break;
+
+			case 'v':
+				invertMatch = 1;
+				break;
+
+			case 'L':
+				filesWithoutMatch = 1;
+				onlyFilenames = 0;
+				break;
+
+			case 'c':
+				count = 1;
+				break;
+
+			case 'h':
+				noFileName = 1;
+				break;
+
+			case 'H':
+				withFileName = 1;
 				break;
 
 			case '\0': // option will hold value 0 when the long option doesn't have any equivalent short option
@@ -213,36 +248,86 @@ int fixString(char *filename, char *pattern, char *dir, int oneFile) { // oneFil
 	if (!strcmp(filename, "-"))
 		fp = stdin;
 	else
-		fp = fopen(filename, "r"); // 1. filename
+		fp = fopen(filename, "r");
 	char line[1024];
 
 	if (fp == NULL) {
-		printf("%s\n", filename);
+		printf("grep: %s: ", filename);
 		perror("");
 		return EINVAL;
 	}
 	
-	int lenSubStr = strlen(pattern); // 3. pattern
-	int *matches, i, j, k, lineCount = 0;
+	int lenSubStr = strlen(pattern);
+	int *matches, i, j, k, lineCount = 0, matchingCount = 0; // matchingCount is for -c flag
+
+	int matchFound = 0;
 	
-	while (readLine(line, 1024, fp)) {
+	while (readLine(line, sizeof(line), fp)) {
 		lineCount++;
-		matches = substr(line, pattern, ignoreCase, wordRegexp), j = 0; // 4. ignoreCase
+		matches = substr(line, pattern, ignoreCase, wordRegexp, lineRegexp), j = 0; // 4. ignoreCase
 		if (!matches) {
 			fprintf(stderr, "No Memory\n");
 			return ENOMEM;
 		}
-		if (matches[0] == -1) {
+		if (matches[0] == -1) { // no match at all
 			//fprintf(stderr, "No Match\n");
 			//return 0;
+			if (invertMatch) {
+				
+				if (filesWithoutMatch) {
+					matchFound = 1; // for -L flag
+					break;
+				}
+				
+				if (onlyFilenames) {
+					purple();
+					if (fp == stdin)
+						printf("(standard input)\n");
+					else {
+						if (dir[0] != '\0')
+							printf("%s", dir);
+						printf("%s\n", filename);
+					}
+					Default();
+					return 0;
+				}
+				
+				if (count) {
+					matchingCount++; // for -c flag with -v flag
+					continue;
+				}
+
+				purple();
+				if ((oneFile != 1 || withFileName) && !noFileName) { // if multiple files are sent by user
+					if (fp == stdin)
+						printf("(standard input):");
+					else {
+						if (dir[0] != '\0')
+							printf("%s", dir);
+						printf("%s:", filename);
+					}
+				}
+				Default();
+				printf("%s\n", line);
+			}
+
 			free(matches);
 			continue;
+		}
+
+		if (invertMatch)
+			continue;
+
+		if (filesWithoutMatch) {
+			matchFound = 1; // for -L flag
+			break;
 		}
 
 		// when control comes here it means that there is a match
 
 		if (onlyFilenames) {
 			
+			purple();
 			if (fp == stdin)
 				printf("(standard input)\n");
 			else {
@@ -250,11 +335,17 @@ int fixString(char *filename, char *pattern, char *dir, int oneFile) { // oneFil
 					printf("%s", dir);
 				printf("%s\n", filename);
 			}
+			Default();
 			return 0;
 		}
 
+		if (count) {
+			matchingCount++; // for -c flag
+			continue;
+		}
+
 		purple();
-		if (oneFile != 1) { // if multiple files are sent by user
+		if ((oneFile != 1 || withFileName) && !noFileName) { // if multiple files are sent by user
 			if (fp == stdin)
 				printf("(standard input):");
 			else {
@@ -286,6 +377,35 @@ int fixString(char *filename, char *pattern, char *dir, int oneFile) { // oneFil
 		printf("\n");	
 		free(matches);
 	}
+
+	if (!matchFound && filesWithoutMatch == 1) {
+		purple();
+		if (fp == stdin)
+			printf("(standard input)\n");
+		else {
+			if (dir[0] != '\0')
+				printf("%s", dir);
+			printf("%s\n", filename);
+		}
+		Default();
+	}
+
+	if (count && !filesWithoutMatch && !onlyFilenames) {
+
+		purple(); // green color
+		if ((oneFile != 1 || withFileName) && !noFileName) {
+			if (fp == stdin)
+				printf("(standard input):");
+			else {
+				if (dir[0] != '\0')
+					printf("%s", dir);
+				printf("%s:", filename);
+			}
+		}
+		Default();
+
+		printf("%d\n", matchingCount);
+	}
 	free(dir);	
 	fclose(fp);
 	return 0;
@@ -296,11 +416,11 @@ int regMatch(char *filename, regex_t regexp, char *dir, int oneFile) {
 	if (!strcmp(filename, "-"))
 		fp = stdin;
 	else
-		fp = fopen(filename, "r"); // 1. filename
+		fp = fopen(filename, "r");
 	char line[1024];
 
 	if (fp == NULL) {
-		printf("%s\n", filename);
+		printf("grep: %s\n", filename);
 		perror("");
 		return EINVAL;
 	}
@@ -317,11 +437,12 @@ int regMatch(char *filename, regex_t regexp, char *dir, int oneFile) {
 	regexStruct *matches; // matches will hold the info about matched substring
 
 	int lineCount = 0;
+	int matchFound = 0, matchingCount = 0; // matchingCount is for -c flag;
 
-	while (readLine(line, 1024, fp)) {
+	while (readLine(line, sizeof(line), fp)) {
 		lineCount++;
 		//matches = regex(&regexp, argv[optind + 1]); // optind + 1 -> string
-		matches = regex(&regexp, line, wordRegexp);
+		matches = regex(&regexp, line, wordRegexp, lineRegexp);
 		
 		if (!matches) { // matches is NULL
 			fprintf(stderr, "No Memory\n");
@@ -337,8 +458,56 @@ int regMatch(char *filename, regex_t regexp, char *dir, int oneFile) {
 			regexDestroy(&regexp);
 			free(matches);
 			return 0;*/
+
+			if (invertMatch) {
+
+				if (filesWithoutMatch) {
+					matchFound = 1; // for -L flag
+					break;
+				}
+
+				if (onlyFilenames) {
+					purple();
+					if (fp == stdin)
+						printf("(standard input)\n");
+					else {
+						if (dir[0] != '\0')
+							printf("%s", dir);
+						printf("%s\n", filename);
+					}
+					Default();
+					return 0;
+				}
+
+				if (count) {
+					matchingCount++;
+					continue;
+				}
+
+				purple(); // green color
+				if ((oneFile != 1 || withFileName) && !noFileName) {
+					if (fp == stdin)
+						printf("(standard input):");
+					else {
+						if (dir[0] != '\0')
+							printf("%s", dir);
+						printf("%s:", filename);
+					}
+				}
+				Default();
+				printf("%s\n", line);
+			}
+
 			free(matches);
 			continue;
+		}
+
+		if (invertMatch)
+			continue;
+
+		if (filesWithoutMatch) {
+			matchFound = 1; // for -L flag
+			break;
 		}
 
 		// when control comes here it means that there is a match
@@ -355,9 +524,14 @@ int regMatch(char *filename, regex_t regexp, char *dir, int oneFile) {
 			Default();
 			return 0;
 		}
+		
+		if (count) {
+			matchingCount++;
+			continue;
+		}
 
 		purple(); // green color
-		if (oneFile != 1) {
+		if ((oneFile != 1 || withFileName) && !noFileName) {
 			if (fp == stdin)
 				printf("(standard input):");
 			else {
@@ -391,6 +565,36 @@ int regMatch(char *filename, regex_t regexp, char *dir, int oneFile) {
 		//regexDestroy(&regexp);
 		//regexCompile(&regexp, pattern, regexCompilation, ignoreCase); // compile the regex again because while matching the previous string, regex.h modifies this regex
 	}
+
+	if (!matchFound && filesWithoutMatch == 1) {
+		purple();
+		if (fp == stdin)
+			printf("(standard input)\n");
+		else {
+			if (dir[0] != '\0')
+				printf("%s", dir);
+			printf("%s\n", filename);
+		}
+		Default();
+	}
+
+	if (count && !filesWithoutMatch && !onlyFilenames) { // when filesWithoutMatch is set we don't need to print count
+		
+		purple(); // green color
+		if ((oneFile != 1 || withFileName) && !noFileName) {
+			if (fp == stdin)
+				printf("(standard input):");
+			else {
+				if (dir[0] != '\0')
+					printf("%s", dir);
+				printf("%s:", filename);
+			}
+		}
+		Default();
+		
+		printf("%d\n", matchingCount);
+	}
+
 	free(dir);
 	fclose(fp);
 	return 0;
@@ -401,7 +605,7 @@ char *currentDir(char *str, int j) {
    char *retStr;
    retStr = (char*) calloc(1024, sizeof(char));
    if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        int *matches = substr(cwd, str, NO_IGNORE_CASE, 0);
+        int *matches = substr(cwd, str, NO_IGNORE_CASE, 0, 0);
         int i = 0;
         while (matches[i] != -1) // find the last match
             i++;
@@ -502,7 +706,7 @@ void Default() {
 }
 
 char *readLine(char *str, int max, FILE *fp) {
-	int i, ret;
+	/*int i, ret;
 	char ch;
 	ret = fread(&ch, 1, 1, fp);
 	for (i = 0; i < max - 1 && ret && ch != '\n' && ch != EOF; i++) {
@@ -514,6 +718,14 @@ char *readLine(char *str, int max, FILE *fp) {
 		while (getchar() != '\n');
 		
 	if (ret == 0 && i == 0)
+		return NULL;*/
+
+	char* ret = fgets(str, max, fp);
+
+	if (ret == NULL)
 		return NULL;
+
+	int len = strlen(str);
+	str[len - 1] = '\0'; // replace the inserted \n with \0
 	return str;
 }
