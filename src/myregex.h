@@ -4,7 +4,6 @@ typedef struct state {
             // c = 257 - match
 	struct state *out;
 	struct state *out1;
-	int lastlist;
     int isIncluded; // if isIncluded = 1 then we won't include it again in nlist
 }state;
 

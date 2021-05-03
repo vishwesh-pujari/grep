@@ -1,4 +1,5 @@
 #include "matching.h"
+#include "myregex.h"
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -7,7 +8,7 @@
 #include <glob.h> // for glob()
 #include <unistd.h>
 
-#define LONG_OPTIONS_SIZE 16 // the last struct of longoptions must be 0
+#define LONG_OPTIONS_SIZE 17 // the last struct of longoptions must be 0
 
 void printUsage(); // prints the appropriate usage and exits the program
 //int validateNumberOfOptions(int);
@@ -16,8 +17,8 @@ void initLongOpts(struct option *longoptions, int index, const char *name, int h
 char *readLine(char*, int, FILE*); // reads line by line from a file
 //int matching(char *filename, char *pattern);
 int fixString(char *filename, char *pattern, char *dir, int oneFile); // for -F option
-int regMatch(char *filename, regex_t regexp, char *dir, int oneFile); // for regular expressions
-void dirWalk(char*, char *, int, char *pattern, regex_t regexp); // walk through the directory and open appropriate files
+int regMatch(char *filename, regex_t regexp, myregex myregex, char *dir, int oneFile); // for regular expressions
+void dirWalk(char*, char *, int, char *pattern, regex_t regexp, myregex myregex); // walk through the directory and open appropriate files
 char* currentDir(char*, int); // returns the directoryname
 
 void green(); // change to green color
@@ -28,7 +29,7 @@ void Default(); // change to Default color
 
 int regexCompilation = BASIC_REGEX, ignoreCase = NO_IGNORE_CASE, fixedString = NO_FIXED_STRING, recusrive = NO_RECURSION; // put default options
 int lineNumber = NO_LINE_NUMBER, onlyFilenames = 0, wordRegexp = 0, lineRegexp = 0, invertMatch = 0, filesWithoutMatch = 0, count = 0;
-int noFileName = 0, withFileName = 0;
+int noFileName = 0, withFileName = 0, myregexp = 0;
 
 int main(int argc, char **argv) { // To give space seperated command line arg then use " "
 				  // eg, ./a.out "[a-z] [0-9]" "Vishwesh 123"
@@ -54,14 +55,15 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 	initLongOpts(longoptions, 12, "count", no_argument, NULL, 'c');
 	initLongOpts(longoptions, 13, "no-filename", no_argument, NULL, 'h');
 	initLongOpts(longoptions, 14, "with-filename", no_argument, NULL, 'H');
-	initLongOpts(longoptions, 15, "", 0, NULL, 0); // last struct must be initialised with 0	
+	initLongOpts(longoptions, 15, "my-regexp", no_argument, NULL, 'M');
+	initLongOpts(longoptions, 16, "", 0, NULL, 0); // last struct must be initialised with 0	
 
 	// The getopt_long() function works like getopt() except that it also accepts long options, started with two dashes
 	// long option starts with -- and short option with -
 	// if flag is NULL, then getopt_long() returns val.  (For example, the  calling  program may  set  val  to the equivalent short option character.)
 
 	// --ignore-case and --no-ignore-case can be used both at a time. The one who is second is taken into consideration 
-	while ((option = getopt_long(argc, argv, "GEiFrnlwxvLchH", longoptions, &longIndex)) != -1) { // until no more options are left
+	while ((option = getopt_long(argc, argv, "GEiFrnlwxvLchHM", longoptions, &longIndex)) != -1) { // until no more options are left
 		//printf("option = %d, longIndex = %d\n", option, longIndex);
 		switch (option) {
 			case 'G':
@@ -133,6 +135,10 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 				withFileName = 1;
 				break;
 
+			case 'M':
+				myregexp = 1;
+				break;
+
 			case '\0': // option will hold value 0 when the long option doesn't have any equivalent short option
 				if (!strcmp(longoptions[longIndex].name, "no-ignore-case"))
 					ignoreCase = NO_IGNORE_CASE;
@@ -178,6 +184,10 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 		}
 	}
 
+	myregex myregex;
+	if (myregexp)
+		myregcomp(&myregex, argv[optind]);
+
 	int i, lenArgv, j = optind + 1, oneFile = 0, ret; // when oneFile = 1 then we dont have to print the filename
 
 	if (j == argc - 1)
@@ -187,7 +197,7 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 		if (fixedString == FIXED_STRING)
 			fixString("-", argv[optind], NULL, 1);
 		else // Regex Matching here
-			regMatch("-", regexp, NULL, 1);
+			regMatch("-", regexp, myregex, NULL, 1);
 	}
 
 	char thisDir[1024];
@@ -220,7 +230,7 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 		if (ret == 0) { // argv[j] + i + 1 is a directory
 			// directory has been changed
 			if (recusrive == RECURSION)
-				dirWalk("*", str, i, argv[optind], regexp);
+				dirWalk("*", str, i, argv[optind], regexp, myregex);
 			else {
 				char* currDir = currentDir(str, i);
 				if (currDir[0] != '\0')
@@ -233,12 +243,15 @@ int main(int argc, char **argv) { // To give space seperated command line arg th
 			if (fixedString == FIXED_STRING)
 				fixString(argv[j] + i + 1, argv[optind], currentDir(str, i), oneFile);
 			else // Regex Matching here
-				regMatch(argv[j] + i + 1, regexp, currentDir(str, i), oneFile);
+				regMatch(argv[j] + i + 1, regexp, myregex, currentDir(str, i), oneFile);
 		}
 		chdir(thisDir); // as we had changed directory we set back to original here
 	}
 	if (fixedString != FIXED_STRING)
 		regexDestroy(&regexp);
+
+	if (myregexp)
+		myregdestroy(&myregex);
 	return 0;
 }
 
@@ -411,7 +424,7 @@ int fixString(char *filename, char *pattern, char *dir, int oneFile) { // oneFil
 	return 0;
 }
 
-int regMatch(char *filename, regex_t regexp, char *dir, int oneFile) {
+int regMatch(char *filename, regex_t regexp, myregex myregex, char *dir, int oneFile) {
 	FILE* fp;
 	if (!strcmp(filename, "-"))
 		fp = stdin;
@@ -423,6 +436,30 @@ int regMatch(char *filename, regex_t regexp, char *dir, int oneFile) {
 		printf("grep: %s\n", filename);
 		perror("");
 		return EINVAL;
+	}
+
+	if (myregexp) {
+		
+		while (readLine(line, sizeof(line), fp)) {
+
+        	if (myregexec(&myregex, line)) {
+				purple(); // green color
+				if ((oneFile != 1 || withFileName) && !noFileName) {
+					if (fp == stdin)
+						printf("(standard input):");
+					else {
+						if (dir[0] != '\0')
+							printf("%s", dir);
+						printf("%s:", filename);
+					}
+				}
+				Default();
+            	printf("%s\n", line);
+
+			}
+    	}
+
+		return 0;
 	}
 
 	/*regex_t regexp;
@@ -530,7 +567,7 @@ int regMatch(char *filename, regex_t regexp, char *dir, int oneFile) {
 			continue;
 		}
 
-		purple(); // green color
+		purple(); 
 		if ((oneFile != 1 || withFileName) && !noFileName) {
 			if (fp == stdin)
 				printf("(standard input):");
@@ -626,7 +663,7 @@ char *currentDir(char *str, int j) {
    return retStr;
 }
 
-void dirWalk(char *filePattern, char *str, int j, char *pattern, regex_t regexp) {
+void dirWalk(char *filePattern, char *str, int j, char *pattern, regex_t regexp, myregex myregex) {
     glob_t paths; // this structure will hold all information about matched filenames
     int retval, ret;
     
@@ -642,7 +679,7 @@ void dirWalk(char *filePattern, char *str, int j, char *pattern, regex_t regexp)
             ret = chdir(paths.gl_pathv[i]);
             if (ret == 0) { // means paths.gl_pathv[i] is a directory
                 //currentDir();
-                dirWalk(filePattern, str, j, pattern, regexp); // This now works according to the changed directory
+                dirWalk(filePattern, str, j, pattern, regexp, myregex); // This now works according to the changed directory
                 //chdir(".."); // Setting back the direectory to original
                 //currentDir();
 				chdir("..");
@@ -652,7 +689,7 @@ void dirWalk(char *filePattern, char *str, int j, char *pattern, regex_t regexp)
 				if (fixedString == FIXED_STRING)
 					fixString(paths.gl_pathv[i], pattern, currentDir(str, j), 0);
 				else
-					regMatch(paths.gl_pathv[i], regexp, currentDir(str, j), 0);
+					regMatch(paths.gl_pathv[i], regexp, myregex, currentDir(str, j), 0);
 			}
         }
         globfree( &paths );

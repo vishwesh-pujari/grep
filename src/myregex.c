@@ -650,11 +650,11 @@ int myregcomp(myregex* reg, char* regex) {
 
 int myregexec(myregex* reg, char* str) {
     
-    state* temp, *temp1, *temp2;
+    state* temp;
     temp = reg->start;
 
     state* clist[25], *nlist[25]; // current list, next list
-    int ic = 0, in = 0, i, stri = 0, count = 0, j;
+    int ic = 0, in = 0, i, stri = 0, count = 0;
     int flag = 0;
     clist[ic++] = temp;
 
@@ -668,21 +668,24 @@ int myregexec(myregex* reg, char* str) {
         while (ic != 0) {
             //printf("1\n");
 
-            for (i = 0; i < ic; i++) {
+            /*for (i = 0; i < ic; i++) {
                 printf("%d\n", clist[i]->c);
             }
-            printf("end\n");
+            printf("end\n");*/
 
             in = 0;
             for (i = 0; i < ic; i++) {
                 if (clist[i]->c == 256) { // split
 
-                    temp = clist[i];
-                    temp1 = temp;
+                    /*temp = clist[i];
+                    temp1 = temp->out;
 
-                    while (temp1->c == 256) {
-                        temp2 = temp1;
-                        temp1 = temp1->out;
+                    if (temp1->c == 256) {
+
+                        while (temp1->c == 256) {
+                            
+                            temp1 = temp1->out;
+                        }
                     }
                     
                     if (temp2 == temp) { // out branch from 256 contains a literal
@@ -705,24 +708,50 @@ int myregexec(myregex* reg, char* str) {
                     } else {
                         nlist[in++] = temp2->out;
                         nlist[in++] = temp2->out1;
-                    }
+                    }*/
 
 
-                    //nlist[in++] = clist[i]->out;
-                    //nlist[in++] = clist[i]->out1;
+                    nlist[in++] = clist[i]->out;
+                    nlist[in++] = clist[i]->out1;
+
+                    //if (i == ic - 1)
+                    //    stri++;
+                } else if (clist[i]->c == 257) {
+                    //printf("I AM HERE\n");
+                    flag = 1; 
+                    break;
                 } else {
+                    //printf("str[stri] = %c\n", str[stri]);
+                    //printf("clist[i]->c = %c\n", clist[i]->c);
                     if (str[stri] == clist[i]->c) {
+                        //if (str[stri + 1] != clist[i]->c)
                         nlist[in++] = clist[i]->out;
-                        if (nlist[in - 1]->c == 257) {
-                            flag = 1;
-                            break;
-                        }
+                        //printf("clist[i]->out->c = %c\n", clist[i]->out->c);
+                        //else {
+                        //    nlist[in++] = clist[i];
+                            //break;
+                        //}
+                        //printf("%c\n", str[stri]);
+                        /*printf("i = %d\n", i);
+                        printf("ic = %d\n", ic);
+                        if (i == ic - 1) {
+                            printf("I am here\n");
+                            stri++;
+                        }*/
+                        /*if (i == ic - 1)
+                            stri++;*/
+                    }
+                    if (i == ic - 1) {
+                        //printf("I am here\n");
                         stri++;
                     }
                 }
+                
             }
+            if (flag)
+                break;
 
-            ic = in;
+            ic = in; // make next list as current list for next iteration
             for (i = 0; i < in; i++)
                 clist[i] = nlist[i];
         }
@@ -733,11 +762,11 @@ int myregexec(myregex* reg, char* str) {
     }
 
     if (flag) {
-        printf("Matched : %d\n", count);
+        //printf("Matched : %d - %d\n", count, stri);
         return 1;
     }
 
-    printf("Unmatched\n");
+    //printf("Unmatched\n");
     return 0;
 }
 
@@ -807,7 +836,7 @@ void myregdestroy(myregex* reg) {
 
         //printf("ic = %d\n", ic);
         for (i = 0; i < ic; i++) {
-            printf("%c\n", clist[i]->c);
+            //printf("%c\n", clist[i]->c);
             clist[i]->isIncluded = 1;
         }
 
